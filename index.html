@@ -12,7 +12,7 @@
   --gold:#F5A623; --green:#1A7A4A; --red:#C0392B; --purple:#6A1B9A;
   --teal:#004D40; --indigo:#1A237E; --cream:#FDFAF5; --sand:#F0EAD6;
   --rule:#E0D8C8; --muted:#6B7C93; --white:#FFFFFF; --text:#1A2E42;
-  --lt-blue:#EEF4FE; --lt-green:#E8F5EE; --lt-yellow:#FFFDE7;
+  --lt-blue:#EEF4FE; --lt-green:#E8F5EE; --indigo:#1A237E; --gold:#F5A623; --lt-yellow:#FFFDE7;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -246,6 +246,87 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 @media(max-width:1000px){.detail-kpi-row{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:700px){.stat-row{grid-template-columns:repeat(3,1fr)}.emp-grid{grid-template-columns:1fr 1fr}.detail-kpi-row{grid-template-columns:1fr 1fr 1fr}.confirm-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:500px){.main{padding:16px}.stat-row{grid-template-columns:1fr 1fr}.emp-grid{grid-template-columns:1fr}.cutoff-bar{grid-template-columns:1fr}}
+
+/* ── SAVE REMINDER BANNER ── */
+.save-banner{display:none;position:sticky;top:54px;z-index:90;background:#92400E;color:white;padding:8px 20px;font-size:13px;font-weight:500;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.save-banner.show{display:flex}
+.save-banner .sb-right{display:flex;gap:10px;align-items:center;flex-shrink:0}
+.save-banner .sb-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+.save-banner .sb-btn.primary{background:white;color:#92400E}
+.save-banner .sb-btn:hover{background:rgba(255,255,255,.25)}
+
+/* ── ARCHIVE OVERLAY ── */
+.archive-overlay{display:none;position:fixed;inset:0;background:var(--cream);z-index:200;flex-direction:column;overflow:hidden}
+.archive-overlay.open{display:flex}
+.archive-topbar{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+.archive-topbar h2{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:white;margin-right:auto}
+.archive-body{display:grid;grid-template-columns:280px 1fr;flex:1;overflow:hidden}
+.archive-sidebar{background:white;border-right:1px solid var(--rule);display:flex;flex-direction:column;overflow:hidden}
+.archive-sidebar-tabs{display:flex;border-bottom:1px solid var(--rule)}
+.asb-tab{flex:1;padding:11px 8px;font-size:12px;font-weight:600;text-align:center;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s}
+.asb-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
+.archive-list{flex:1;overflow-y:auto;padding:8px}
+.archive-item{padding:10px 12px;border-radius:8px;cursor:pointer;transition:all .15s;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.archive-item:hover{background:var(--lt-blue)}
+.archive-item.active{background:var(--lt-blue);font-weight:600;color:var(--blue)}
+.archive-item-name{font-size:13px;color:var(--text)}
+.archive-item.active .archive-item-name{color:var(--blue)}
+.archive-item-sub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.archive-loading{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+.archive-main{overflow-y:auto;padding:24px}
+.archive-main h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.archive-main .subtitle{font-size:13px;color:var(--muted);margin-bottom:20px;font-family:'DM Mono',monospace}
+
+/* ── ARCHIVE EMPLOYEE DETAIL ── */
+.arch-kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.arch-kpi{background:white;border:1px solid var(--rule);border-radius:10px;padding:14px}
+.arch-kpi .kv{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy)}
+.arch-kpi .kl{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.arch-kpi.blue .kv{color:var(--blue)}.arch-kpi.green .kv{color:var(--green)}.arch-kpi.purple .kv{color:var(--purple)}.arch-kpi.gold .kv{color:var(--gold)}
+
+/* ── CUTOFF CARD ── */
+.cutoff-cards{display:flex;flex-direction:column;gap:12px}
+.cutoff-card-ar{background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.cutoff-card-ar .cc-hd{padding:12px 16px;background:var(--sand);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.cutoff-card-ar .cc-hd h4{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--navy)}
+.cutoff-card-ar .cc-hd .cc-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.cutoff-card-ar .cc-body{padding:0}
+.cutoff-card-ar .cc-body.collapsed{display:none}
+
+/* ── ARCHIVE TABLE ── */
+table.arch-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+table.arch-tbl thead th{text-align:left;padding:9px 12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--rule);white-space:nowrap}
+table.arch-tbl thead th.num{text-align:right}
+table.arch-tbl tbody td{padding:8px 12px;border-bottom:1px solid #F5F0E8;vertical-align:middle}
+table.arch-tbl tbody td.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px}
+table.arch-tbl tbody tr:hover{background:#FAFBFF}
+table.arch-tbl tbody tr:last-child td{border-bottom:none}
+.arch-badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:2px 6px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.ab-ot{background:#E8F5EE;color:var(--green)}.ab-nd{background:#EDE7F6;color:var(--purple)}.ab-night{background:#E3F2FD;color:var(--blue)}.ab-warn{background:#FFF3E0;color:#E65100}
+
+/* ── WEEK BREAKDOWN GRID ── */
+.week-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.week-cell{background:var(--cream);border:1px solid var(--rule);border-radius:8px;padding:12px}
+.week-cell .wc-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px}
+.week-cell .wc-hrs{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--navy)}
+.week-cell .wc-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.wk1{border-top:3px solid var(--indigo)}.wk2{border-top:3px solid var(--blue)}.wk3{border-top:3px solid var(--green)}.wk4{border-top:3px solid var(--gold)}
+
+
+/* ── ARCHIVE PERIOD VIEW ── */
+.period-emp-row{display:grid;grid-template-columns:200px repeat(6,1fr);gap:0;border-bottom:1px solid var(--rule)}
+.period-emp-row:last-child{border-bottom:none}
+.period-emp-row div{padding:9px 12px;font-size:12.5px}
+.period-emp-row .per-name{font-weight:500;color:var(--text)}
+.period-emp-row .per-num{font-family:'DM Mono',monospace;text-align:right}
+
+@media(max-width:800px){
+  .archive-body{grid-template-columns:1fr}
+  .archive-sidebar{display:none}
+  .arch-kpi-row{grid-template-columns:repeat(3,1fr)}
+  .week-grid{grid-template-columns:repeat(2,1fr)}
+}
+
 </style>
 </head>
 <body>
@@ -253,7 +334,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="logo">PH<span>Payroll</span></div>
-  <div class="topbar-right"></div>
+  <div class="topbar-right"><button class="btn-sm" onclick="openArchive()">📂 Archive</button></div>
 </div>
 
 <!-- STEPS -->
@@ -263,6 +344,44 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
   <div class="step-tab" id="tab-3" onclick="goTo(3)"><div class="step-num">3</div>Analytics</div>
   <div class="step-tab" id="tab-4" onclick="goTo(4)"><div class="step-num">4</div>Save to Sheets</div>
   <div class="step-tab" id="tab-5"><div class="step-num">5</div>Done</div>
+</div>
+
+<!-- SAVE REMINDER BANNER -->
+<div class="save-banner" id="save-banner">
+  <span>⚠ You have unsaved attendance data — save it to Google Sheets to keep it permanently.</span>
+  <div class="sb-right">
+    <button class="sb-btn" onclick="hideSaveBanner()">Dismiss</button>
+    <button class="sb-btn primary" onclick="goTo(4)">Save to Sheets →</button>
+  </div>
+</div>
+
+<!-- ARCHIVE OVERLAY -->
+<div class="archive-overlay" id="archive-overlay">
+  <div class="archive-topbar">
+    <h2>📂 Payroll Archive</h2>
+    <div id="arch-conn-status" style="font-size:12px;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace">Loading…</div>
+    <button class="btn-sm" onclick="refreshArchive()" style="margin-left:8px">🔄 Refresh</button>
+    <button class="btn-sm" onclick="closeArchive()" style="margin-left:4px">✕ Close</button>
+  </div>
+  <div class="archive-body">
+    <!-- Sidebar -->
+    <div class="archive-sidebar">
+      <div class="archive-sidebar-tabs">
+        <div class="asb-tab active" id="asb-emp" onclick="setArchiveView('employees',this)">By Employee</div>
+        <div class="asb-tab" id="asb-period" onclick="setArchiveView('periods',this)">By Period</div>
+      </div>
+      <div class="archive-list" id="archive-list">
+        <div class="archive-loading">Loading from Google Sheets…</div>
+      </div>
+    </div>
+    <!-- Main -->
+    <div class="archive-main" id="archive-main">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:12px">
+        <div style="font-size:40px">👈</div>
+        <div style="font-size:14px;color:var(--muted)">Select an employee or period from the sidebar</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="main">
@@ -478,7 +597,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
     </div>
 
     <p style="margin-top:14px;font-size:11px;color:var(--muted)">
-      Writing directly to Google Sheets via Apps Script
+      One batch write · all 4 sheets in a single request
     </p>
   </div>
 </div>
@@ -498,7 +617,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
     </div>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="resetAll()">Process Another Cutoff</button>
-      <a id="open-sheets-link" href="#" target="_blank" class="btn btn-ghost" style="display:none">Open Google Sheets ↗</a>
+      <button class="btn btn-ghost" onclick="openArchive()">📂 View Archive</button>
     </div>
   </div>
 </div>
@@ -534,7 +653,7 @@ function goTo(n){
     if(i+1===n)t.classList.add('active');
   });
   if(n===3&&Object.keys(employeeMap).length===0)buildAnalytics();
-  if(n===3){renderGrid();closeDetail()}
+  if(n===3){renderGrid();closeDetail();showSaveBanner();}
   if(n===4)renderConfirm();
 }
 
@@ -975,8 +1094,12 @@ function openDetail(empId){
   </tr></tfoot></table>`;
   document.getElementById('d-breakdown').innerHTML=breakdown;
 
-  // Bar chart
-  document.getElementById('d-chart').innerHTML=drawBarChart(emp);
+  // Bar chart — render only when clicked
+  document.getElementById('d-chart').innerHTML=`
+    <div style="text-align:center;padding:40px 20px;background:var(--cream);border-radius:8px;cursor:pointer" onclick="expandBarChart('${empId}')">
+      <div style="font-size:28px;margin-bottom:8px">📊</div>
+      <div style="font-size:13px;color:var(--muted)">Click to view weekly hours chart</div>
+    </div>`;
 
   // Calendar
   let calHtml='';
@@ -1017,6 +1140,13 @@ function openDetail(empId){
       <td>${flags.join(' ')}</td>
     </tr>`;
   }).join('');
+}
+
+function expandBarChart(empId){
+  const emp=employeeMap[empId];
+  if(!emp)return;
+  const el=document.getElementById('d-chart');
+  el.innerHTML=drawBarChart(emp);
 }
 
 function closeDetail(){
@@ -1109,141 +1239,432 @@ function drawCalendar(emp,year,month){
 }
 
 // ══════════════════════════════════════════════════════════════════
+// SAVE REMINDER BANNER
+// ══════════════════════════════════════════════════════════════════
+function showSaveBanner(){document.getElementById('save-banner').classList.add('show')}
+function hideSaveBanner(){document.getElementById('save-banner').classList.remove('show')}
+
+// ══════════════════════════════════════════════════════════════════
 // CONFIRM RENDER
 // ══════════════════════════════════════════════════════════════════
 function renderConfirm() {
-  const cutoff = allSummaryRows[0]?.cutoff_label || '';
   const emps = Object.keys(employeeMap).length;
-  const monthlyRows = Object.values(employeeMap).reduce((s,e) => s + Object.keys(e.monthly).length, 0);
-  const weeklyRows  = Object.values(employeeMap).reduce((s,e) => s + e.weekly.length, 0);
+  const monthlyCount = Object.values(employeeMap).reduce((s,e) => s + Object.keys(e.monthly).length, 0);
+  const weeklyCount  = Object.values(employeeMap).reduce((s,e) => s + e.weekly.length, 0);
   document.getElementById('confirm-grid').innerHTML = `
     <div class="cg-item"><div class="cg-label">Day Records</div><div class="cg-value">${allSummaryRows.length}</div></div>
     <div class="cg-item"><div class="cg-label">Employees</div><div class="cg-value">${emps}</div></div>
     <div class="cg-item"><div class="cg-label">OT Records</div><div class="cg-value">${allSummaryRows.filter(r=>r.ot_hrs>0).length}</div></div>
     <div class="cg-item"><div class="cg-label">Raw Punches</div><div class="cg-value">${rawPunches.length}</div></div>
-    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${monthlyRows}</div></div>
-    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${weeklyRows}</div></div>`;
+    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${monthlyCount}</div></div>
+    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${weeklyCount}</div></div>`;
 }
 
 // ══════════════════════════════════════════════════════════════════
-// API — direct to Apps Script, same pattern as Operations Hub
+// API — direct to Apps Script, no Content-Type header (no CORS preflight)
 // ══════════════════════════════════════════════════════════════════
-async function apiPost(sheet, rows) {
-  const resp = await fetch(GAS_URL, {
-    method: 'POST',
-    body: JSON.stringify({ sheet_name: sheet, rows }),
-  });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  if (data.status !== 'ok') throw new Error(data.error || 'Unknown error');
-  return data;
-}
-
 async function testConn() {
-  const btn = document.getElementById('test-btn');
-  const connEl = document.getElementById('conn-status');
-  const msgEl  = document.getElementById('conn-msg');
-  btn.disabled = true; btn.textContent = 'Testing…';
-  connEl.style.display = 'flex';
-  connEl.className = 'alert alert-info';
-  msgEl.textContent = 'Pinging Apps Script…';
+  const btn=document.getElementById('test-btn');
+  const connEl=document.getElementById('conn-status');
+  const msgEl=document.getElementById('conn-msg');
+  btn.disabled=true; btn.textContent='Testing…';
+  connEl.style.display='flex'; connEl.className='alert alert-info';
+  msgEl.textContent='Pinging Apps Script…';
   try {
-    const resp = await fetch(GAS_URL + '?t=' + Date.now());
-    const data = await resp.json();
-    if (data.status === 'ok') {
-      connEl.className = 'alert alert-info';
-      const missing = data.sheets_missing?.length > 0 ? ` ⚠ Missing sheets: ${data.sheets_missing.join(', ')}` : '';
-      msgEl.innerHTML = `✓ Connected to <strong>${data.spreadsheet || 'Google Sheets'}</strong>.${missing}`;
-    } else {
-      connEl.className = 'alert alert-warn';
-      msgEl.textContent = '✗ ' + (data.error || 'Unexpected response');
+    const resp=await fetch(GAS_URL+'?action=ping&t='+Date.now());
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(data.status==='ok'){
+      connEl.className='alert alert-info';
+      const sheets=data.sheets?` · Sheets: ${data.sheets.join(', ')}`:' ';
+      msgEl.innerHTML='✓ Connected!'+sheets;
+    }else{
+      connEl.className='alert alert-warn';
+      msgEl.textContent='✗ '+(data.error||'Unexpected response');
     }
-  } catch(err) {
-    connEl.className = 'alert alert-warn';
-    msgEl.textContent = '✗ ' + err.message;
-  } finally {
-    btn.disabled = false; btn.textContent = '🔌 Test Connection';
-  }
+  }catch(err){connEl.className='alert alert-warn';msgEl.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;btn.textContent='🔌 Test Connection';}
 }
 
 // ══════════════════════════════════════════════════════════════════
-// WRITE TO GOOGLE SHEETS
+// WRITE TO GOOGLE SHEETS — single batch request
 // ══════════════════════════════════════════════════════════════════
 async function writeToSheets() {
-  const btn  = document.getElementById('confirm-btn');
-  const bar  = document.getElementById('prog-bar');
-  const fill = document.getElementById('prog-fill');
-  const msg  = document.getElementById('status-msg');
+  const btn=document.getElementById('confirm-btn');
+  const bar=document.getElementById('prog-bar');
+  const fill=document.getElementById('prog-fill');
+  const msg=document.getElementById('status-msg');
+  btn.disabled=true; btn.textContent='Saving…'; bar.classList.add('active');
+  const now=new Date().toISOString();
+  const cutoff=allSummaryRows[0]?.cutoff_label||'';
 
-  btn.disabled = true; btn.textContent = 'Saving…';
-  bar.classList.add('active');
-  const now = new Date().toISOString();
-  const cutoff = allSummaryRows[0]?.cutoff_label || '';
-
-  const rawRows = rawPunches.map(r => [
-    r.employee_id, r.employee_name, r.punch_date, r.punch_time,
-    getCutoffLabel(r.punch_date), sourceFile, now
-  ]);
-  const dailyRows = allSummaryRows.map(r => [
-    r.employee_id, r.employee_name, r.work_date, r.time_in, r.time_out,
-    r.total_hrs, r.regular_hrs, r.ot_hrs, r.nd_hrs,
-    r.is_overnight ? 'TRUE' : 'FALSE', r.punch_count,
-    r.cutoff_label, r.source_file, now
-  ]);
-  const mrows = [];
-  Object.values(employeeMap).forEach(emp => {
-    Object.entries(emp.monthly).forEach(([ym, M]) => {
-      mrows.push([emp.id, emp.name, ym,
-        M.w1.h, M.w1.r, M.w1.o, M.w1.n, M.w1.d,
-        M.w2.h, M.w2.r, M.w2.o, M.w2.n, M.w2.d,
-        M.w3.h, M.w3.r, M.w3.o, M.w3.n, M.w3.d,
-        M.w4.h, M.w4.r, M.w4.o, M.w4.n, M.w4.d,
-        M.total.h, M.total.r, M.total.o, M.total.n,
-        M.total.d, emp.avgDailyHrs, emp.otRatePct, emp.ndRatePct,
-        emp.maxDailyHrs, emp.minDailyHrs, emp.overnightDays, emp.totalPunches, cutoff, now]);
+  // Build all 4 datasets
+  const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
+  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now]);
+  const mrows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    Object.entries(emp.monthly).forEach(([ym,M])=>{
+      mrows.push([emp.id,emp.name,ym,M.w1.h,M.w1.r,M.w1.o,M.w1.n,M.w1.d,M.w2.h,M.w2.r,M.w2.o,M.w2.n,M.w2.d,M.w3.h,M.w3.r,M.w3.o,M.w3.n,M.w3.d,M.w4.h,M.w4.r,M.w4.o,M.w4.n,M.w4.d,M.total.h,M.total.r,M.total.o,M.total.n,M.total.d,emp.avgDailyHrs,emp.otRatePct,emp.ndRatePct,emp.maxDailyHrs,emp.minDailyHrs,emp.overnightDays,emp.totalPunches,cutoff,now]);
     });
   });
-  const wrows = [];
-  Object.values(employeeMap).forEach(emp => {
-    emp.weekly.forEach(w => {
-      wrows.push([emp.id, emp.name, w.yearMonth, w.weekNum, w.weekLabel,
-        w.hrs, w.regHrs, w.otHrs, w.ndHrs, w.days, w.avgDailyHrs,
-        w.dateFrom, w.dateTo, w.cutoffLabel, now]);
-    });
+  const wrows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    emp.weekly.forEach(w=>{wrows.push([emp.id,emp.name,w.yearMonth,w.weekNum,w.weekLabel,w.hrs,w.regHrs,w.otHrs,w.ndHrs,w.days,w.avgDailyHrs,w.dateFrom,w.dateTo,w.cutoffLabel,now]);});
   });
 
-  const steps = [
-    ['03_RawPunches',      rawRows,   20, 'Writing raw punches…'],
-    ['04_DailySummary',    dailyRows, 50, 'Writing daily summary…'],
-    ['05_EmployeeMonthly', mrows,     75, 'Writing monthly analytics…'],
-    ['06_EmployeeWeekly',  wrows,    100, 'Writing weekly breakdowns…'],
-  ];
+  msg.textContent='Sending all data in one request…'; fill.style.width='30%';
 
   try {
-    for (const [sheet, rows, pct, label] of steps) {
-      msg.textContent = label; fill.style.width = (pct / 4) + '%';
-      await apiPost(sheet, rows);
-      fill.style.width = pct + '%';
-    }
-    msg.textContent = `✓ Done! ${rawRows.length} punches · ${dailyRows.length} daily · ${mrows.length} monthly · ${wrows.length} weekly rows saved.`;
-    msg.className = 'status-msg ok';
-    document.getElementById('done-msg').textContent =
-      `${dailyRows.length} daily records, ${mrows.length} monthly and ${wrows.length} weekly analytics written to Google Sheets for cutoff ${cutoff}.`;
-    setTimeout(() => goTo(5), 1200);
-  } catch(err) {
-    fill.style.width = '0%';
-    msg.textContent = 'Error: ' + err.message;
-    msg.className = 'status-msg err';
-    btn.disabled = false; btn.textContent = '✓ Save to Google Sheets';
+    // Single batch POST — 1 request instead of 4
+    const resp=await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({
+        action:'write_all',
+        sheets:{
+          '03_RawPunches':rawRows,
+          '04_DailySummary':dailyRows,
+          '05_EmployeeMonthly':mrows,
+          '06_EmployeeWeekly':wrows
+        }
+      })
+    });
+    fill.style.width='90%';
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(data.status!=='ok')throw new Error(data.error||'Unknown error');
+    fill.style.width='100%';
+    msg.textContent='✓ Done! '+rawRows.length+' punches · '+dailyRows.length+' daily · '+mrows.length+' monthly · '+wrows.length+' weekly rows saved.';
+    msg.className='status-msg ok';
+    hideSaveBanner();
+    document.getElementById('done-msg').textContent=dailyRows.length+' daily records and '+mrows.length+' monthly analytics saved for cutoff '+cutoff+'.';
+    setTimeout(()=>goTo(5),1200);
+  }catch(err){
+    fill.style.width='0%';
+    msg.textContent='Error: '+err.message;
+    msg.className='status-msg err';
+    btn.disabled=false; btn.textContent='✓ Save to Google Sheets';
   }
 }
 
-function openSettings() {}
-function closeSettings() {}
-function saveSettings() {}
+// ══════════════════════════════════════════════════════════════════
+// ARCHIVE SYSTEM
+// ══════════════════════════════════════════════════════════════════
+let archiveData={daily:[],monthly:[],weekly:[]};
+let archiveView='employees'; // 'employees' | 'periods'
+let archiveSelected=null;
+let archiveLoaded=false;
 
-function resetAll() {
-  rawPunches=[]; summaryRows=[]; allSummaryRows=[]; activeRows=[]; employeeMap={}; sourceFile='';
+function openArchive(){
+  document.getElementById('archive-overlay').classList.add('open');
+  if(!archiveLoaded)refreshArchive();
+}
+function closeArchive(){document.getElementById('archive-overlay').classList.remove('open');}
+
+async function refreshArchive(){
+  const statusEl=document.getElementById('arch-conn-status');
+  statusEl.textContent='Loading…';
+  try{
+    const resp=await fetch(GAS_URL+'?action=read_all&t='+Date.now());
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(data.status!=='ok')throw new Error(data.error);
+    archiveData={
+      daily:data.daily_summary||[],
+      monthly:data.employee_monthly||[],
+      weekly:data.employee_weekly||[]
+    };
+    archiveLoaded=true;
+    statusEl.textContent=archiveData.daily.length+' day records loaded';
+    renderArchiveSidebar();
+  }catch(err){
+    statusEl.textContent='Error: '+err.message;
+    document.getElementById('archive-list').innerHTML='<div class="archive-loading" style="color:var(--red)">Failed to load: '+err.message+'</div>';
+  }
+}
+
+function setArchiveView(view, el){
+  archiveView=view;
+  document.querySelectorAll('.asb-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  archiveSelected=null;
+  renderArchiveSidebar();
+  document.getElementById('archive-main').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:12px"><div style="font-size:40px">👈</div><div style="font-size:14px;color:var(--muted)">Select ${view==='employees'?'an employee':'a pay period'} from the sidebar</div></div>`;
+}
+
+function renderArchiveSidebar(){
+  const el=document.getElementById('archive-list');
+  if(!archiveLoaded){el.innerHTML='<div class="archive-loading">Loading…</div>';return;}
+
+  if(archiveView==='employees'){
+    // Build unique employee list from daily data
+    const empMap={};
+    archiveData.daily.forEach(r=>{
+      const id=String(r.employee_id);
+      if(!empMap[id]){empMap[id]={id,name:String(r.employee_name),days:0,cutoffs:new Set()};}
+      empMap[id].days++;
+      empMap[id].cutoffs.add(String(r.cutoff_label));
+    });
+    const emps=Object.values(empMap).sort((a,b)=>a.name.localeCompare(b.name));
+    if(!emps.length){el.innerHTML='<div class="archive-loading">No employee data in Sheets yet.</div>';return;}
+    el.innerHTML=emps.map(e=>`
+      <div class="archive-item${archiveSelected===e.id?' active':''}" onclick="selectArchiveEmployee('${e.id}')">
+        <div>
+          <div class="archive-item-name">${e.name}</div>
+          <div class="archive-item-sub">#${e.id} · ${e.days} days · ${e.cutoffs.size} cutoffs</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">›</div>
+      </div>`).join('');
+  }else{
+    // Build unique cutoff periods
+    const periods={};
+    archiveData.daily.forEach(r=>{
+      const c=String(r.cutoff_label);
+      if(!periods[c]){periods[c]={label:c,emps:new Set(),days:0};}
+      periods[c].emps.add(String(r.employee_id));
+      periods[c].days++;
+    });
+    const sorted=Object.values(periods).sort((a,b)=>a.label.localeCompare(b.label));
+    if(!sorted.length){el.innerHTML='<div class="archive-loading">No period data in Sheets yet.</div>';return;}
+    el.innerHTML=sorted.map(p=>`
+      <div class="archive-item${archiveSelected===p.label?' active':''}" onclick="selectArchivePeriod('${p.label}')">
+        <div>
+          <div class="archive-item-name">${p.label}</div>
+          <div class="archive-item-sub">${p.emps.size} employees · ${p.days} day records</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">›</div>
+      </div>`).join('');
+  }
+}
+
+// ── EMPLOYEE DETAIL ──────────────────────────────────────────────
+function selectArchiveEmployee(empId){
+  archiveSelected=empId;
+  renderArchiveSidebar();
+  const daily=archiveData.daily.filter(r=>String(r.employee_id)===empId);
+  const monthly=archiveData.monthly.filter(r=>String(r.employee_id)===empId);
+  const weekly=archiveData.weekly.filter(r=>String(r.employee_id)===empId);
+  const name=daily.length?String(daily[0].employee_name):'Employee '+empId;
+
+  // KPIs
+  const totalHrs=r2(daily.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0));
+  const totalOT=r2(daily.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
+  const totalND=r2(daily.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
+  const cutoffs=[...new Set(daily.map(r=>String(r.cutoff_label)))];
+  const avgDay=daily.length?r2(totalHrs/daily.length):0;
+
+  // Group daily by cutoff
+  const byCutoff={};
+  daily.forEach(r=>{
+    const c=String(r.cutoff_label);
+    if(!byCutoff[c])byCutoff[c]=[];
+    byCutoff[c].push(r);
+  });
+
+  // Get monthly data grouped by year_month
+  const byMonth={};
+  monthly.forEach(r=>{const k=String(r.year_month);if(!byMonth[k])byMonth[k]=r;});
+
+  const initials=name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+
+  let html=`
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--blue));color:white;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:18px;flex-shrink:0">${initials}</div>
+      <div>
+        <h3 style="margin-bottom:2px">${name}</h3>
+        <div class="subtitle">ID #${empId} · ${daily.length} days worked · ${cutoffs.length} pay period${cutoffs.length!==1?'s':''} on record</div>
+      </div>
+    </div>
+    <div class="arch-kpi-row">
+      <div class="arch-kpi"><div class="kv">${totalHrs}h</div><div class="kl">Total Hours</div></div>
+      <div class="arch-kpi blue"><div class="kv">${daily.length}</div><div class="kl">Days Worked</div></div>
+      <div class="arch-kpi"><div class="kv">${avgDay}h</div><div class="kl">Avg Per Day</div></div>
+      <div class="arch-kpi green"><div class="kv">${totalOT}h</div><div class="kl">OT Hours</div></div>
+      <div class="arch-kpi purple"><div class="kv">${totalND}h</div><div class="kl">Night Diff</div></div>
+    </div>`;
+
+  // Monthly week breakdown if available
+  if(Object.keys(byMonth).length>0){
+    html+=`<div style="margin-bottom:20px">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">Monthly Breakdown · W1=days 1–7, W2=8–14, W3=15–21, W4=22+</div>
+      ${Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([ym,M])=>{
+        const w1h=parseFloat(M.w1_hrs)||0,w2h=parseFloat(M.w2_hrs)||0,w3h=parseFloat(M.w3_hrs)||0,w4h=parseFloat(M.w4_hrs)||0;
+        const totH=parseFloat(M.total_hrs)||0,totOT=parseFloat(M.total_ot_hrs)||0,totND=parseFloat(M.total_nd_hrs)||0;
+        const [yr,mo]=ym.split('-').map(Number);
+        const mName=new Date(yr,mo-1,1).toLocaleString('default',{month:'long'});
+        return `<div style="background:white;border:1px solid var(--rule);border-radius:10px;margin-bottom:10px;overflow:hidden">
+          <div style="padding:11px 16px;background:var(--sand);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--navy)">${mName} ${yr}</div>
+            <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted)">${totH}h total · OT ${totOT}h · ND ${totND}h</div>
+          </div>
+          <div class="week-grid" style="padding:12px">
+            <div class="week-cell wk1"><div class="wc-label">Week 1 (1–7)</div><div class="wc-hrs">${w1h}h</div><div class="wc-sub">OT ${parseFloat(M.w1_ot)||0}h · ND ${parseFloat(M.w1_nd)||0}h · ${parseInt(M.w1_days)||0} days</div></div>
+            <div class="week-cell wk2"><div class="wc-label">Week 2 (8–14)</div><div class="wc-hrs">${w2h}h</div><div class="wc-sub">OT ${parseFloat(M.w2_ot)||0}h · ND ${parseFloat(M.w2_nd)||0}h · ${parseInt(M.w2_days)||0} days</div></div>
+            <div class="week-cell wk3"><div class="wc-label">Week 3 (15–21)</div><div class="wc-hrs">${w3h}h</div><div class="wc-sub">OT ${parseFloat(M.w3_ot)||0}h · ND ${parseFloat(M.w3_nd)||0}h · ${parseInt(M.w3_days)||0} days</div></div>
+            <div class="week-cell wk4"><div class="wc-label">Week 4 (22+)</div><div class="wc-hrs">${w4h}h</div><div class="wc-sub">OT ${parseFloat(M.w4_ot)||0}h · ND ${parseFloat(M.w4_nd)||0}h · ${parseInt(M.w4_days)||0} days</div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Cutoff-by-cutoff daily table
+  html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">Daily Records by Pay Period</div>
+    <div class="cutoff-cards">`;
+
+  Object.entries(byCutoff).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([cutoff,rows])=>{
+    const totH=r2(rows.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0));
+    const totOT=r2(rows.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
+    const totND=r2(rows.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
+    const cid='cc-'+cutoff.replace(/[|\s]/g,'_');
+    html+=`<div class="cutoff-card-ar">
+      <div class="cc-hd" onclick="toggleCutoff('${cid}')">
+        <h4>${cutoff}</h4>
+        <div class="cc-meta">${rows.length} days · ${totH}h total · OT ${totOT}h · ND ${totND}h</div>
+        <div style="font-size:14px;color:var(--muted);margin-left:8px" id="${cid}-icon">▾</div>
+      </div>
+      <div class="cc-body" id="${cid}">
+        <table class="arch-tbl">
+          <thead><tr>
+            <th>Date</th><th>Day</th><th>Time In</th><th>Time Out</th>
+            <th class="num">Total</th><th class="num">Regular</th>
+            <th class="num">OT</th><th class="num">Night Diff</th>
+            <th>Punches</th><th>Flags</th>
+          </tr></thead>
+          <tbody>
+            ${rows.sort((a,b)=>String(a.work_date).localeCompare(String(b.work_date))).map(r=>{
+              const flags=[];
+              if(String(r.is_overnight)==='TRUE')flags.push('<span class="arch-badge ab-night">🌙</span>');
+              if(parseFloat(r.ot_hrs)>0)flags.push(`<span class="arch-badge ab-ot">OT</span>`);
+              if(parseFloat(r.nd_hrs)>0)flags.push(`<span class="arch-badge ab-nd">ND</span>`);
+              return `<tr>
+                <td style="font-family:'DM Mono',monospace;font-size:11px">${r.work_date}</td>
+                <td style="font-size:11px;color:var(--muted)">${getDayName(String(r.work_date))}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${r.time_in||'—'}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${r.time_out||'—'}</td>
+                <td class="num">${r.total_hrs}h</td>
+                <td class="num">${r.regular_hrs}h</td>
+                <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
+                <td class="num" style="color:var(--purple)">${parseFloat(r.nd_hrs)>0?r.nd_hrs+'h':'–'}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.punch_count}</td>
+                <td>${flags.join(' ')}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:var(--sand);font-weight:700">
+              <td colspan="4" style="font-size:12px;padding:8px 12px">CUTOFF TOTAL</td>
+              <td class="num">${totH}h</td>
+              <td class="num">${r2(rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+              <td class="num" style="color:var(--blue)">${totOT}h</td>
+              <td class="num" style="color:var(--purple)">${totND}h</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  html+='</div>';
+  document.getElementById('archive-main').innerHTML=html;
+}
+
+// ── PERIOD DETAIL ────────────────────────────────────────────────
+function selectArchivePeriod(cutoff){
+  archiveSelected=cutoff;
+  renderArchiveSidebar();
+  const daily=archiveData.daily.filter(r=>String(r.cutoff_label)===cutoff);
+  const monthly=archiveData.monthly.filter(r=>String(r.cutoff_label)===cutoff);
+
+  // Group by employee
+  const empMap={};
+  daily.forEach(r=>{
+    const id=String(r.employee_id);
+    if(!empMap[id]){empMap[id]={id,name:String(r.employee_name),days:0,totalHrs:0,otHrs:0,ndHrs:0,rows:[]};}
+    empMap[id].days++;
+    empMap[id].totalHrs+=parseFloat(r.total_hrs)||0;
+    empMap[id].otHrs+=parseFloat(r.ot_hrs)||0;
+    empMap[id].ndHrs+=parseFloat(r.nd_hrs)||0;
+    empMap[id].rows.push(r);
+  });
+  const emps=Object.values(empMap).sort((a,b)=>a.name.localeCompare(b.name));
+  emps.forEach(e=>{e.totalHrs=r2(e.totalHrs);e.otHrs=r2(e.otHrs);e.ndHrs=r2(e.ndHrs);});
+
+  const grandHrs=r2(emps.reduce((s,e)=>s+e.totalHrs,0));
+  const grandOT=r2(emps.reduce((s,e)=>s+e.otHrs,0));
+  const grandND=r2(emps.reduce((s,e)=>s+e.ndHrs,0));
+
+  let html=`
+    <h3>${cutoff}</h3>
+    <div class="subtitle">${emps.length} employees · ${daily.length} day records · ${grandHrs}h total</div>
+    <div class="arch-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="arch-kpi blue"><div class="kv">${emps.length}</div><div class="kl">Employees</div></div>
+      <div class="arch-kpi"><div class="kv">${grandHrs}h</div><div class="kl">Total Hours</div></div>
+      <div class="arch-kpi green"><div class="kv">${grandOT}h</div><div class="kl">Total OT</div></div>
+      <div class="arch-kpi purple"><div class="kv">${grandND}h</div><div class="kl">Total Night Diff</div></div>
+    </div>
+
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px">All Employees This Period</div>
+    <div style="background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:20px">
+      <table class="arch-tbl">
+        <thead><tr>
+          <th>Employee</th><th class="num">Days</th>
+          <th class="num">Total Hrs</th><th class="num">Regular</th>
+          <th class="num">OT Hrs</th><th class="num">Night Diff</th>
+          <th class="num">Avg/Day</th>
+        </tr></thead>
+        <tbody>
+          ${emps.map(e=>`<tr onclick="setArchiveView('employees',document.getElementById('asb-emp'));selectArchiveEmployee('${e.id}')" style="cursor:pointer">
+            <td><div style="font-weight:500">${e.name}</div><div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">#${e.id}</div></td>
+            <td class="num">${e.days}</td>
+            <td class="num" style="font-weight:600">${e.totalHrs}h</td>
+            <td class="num">${r2(e.rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+            <td class="num" style="color:var(--blue)">${e.otHrs>0?e.otHrs+'h':'–'}</td>
+            <td class="num" style="color:var(--purple)">${e.ndHrs>0?e.ndHrs+'h':'–'}</td>
+            <td class="num" style="color:var(--muted)">${e.days>0?r2(e.totalHrs/e.days)+'h':'–'}</td>
+          </tr>`).join('')}
+          <tr style="background:var(--sand);font-weight:700">
+            <td style="padding:9px 12px">PERIOD TOTAL</td>
+            <td class="num">${daily.length}</td>
+            <td class="num">${grandHrs}h</td>
+            <td class="num">${r2(daily.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+            <td class="num" style="color:var(--blue)">${grandOT}h</td>
+            <td class="num" style="color:var(--purple)">${grandND}h</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:-12px;margin-bottom:16px">Click any employee row to view their full history ↗</div>`;
+
+  document.getElementById('archive-main').innerHTML=html;
+}
+
+function toggleCutoff(id){
+  const body=document.getElementById(id);
+  const icon=document.getElementById(id+'-icon');
+  const collapsed=body.classList.toggle('collapsed');
+  if(icon)icon.textContent=collapsed?'▸':'▾';
+}
+
+function getDayName(dateStr){
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  try{const p=dateStr.split(/[-/]/);const d=new Date(p[0],p[1]-1,p[2],12);return days[d.getDay()];}catch{return'';}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// OVERRIDE goTo to show save banner when leaving analytics step
+// ══════════════════════════════════════════════════════════════════
+const _origGoTo=goTo;
+
+// ══════════════════════════════════════════════════════════════════
+// MISC
+// ══════════════════════════════════════════════════════════════════
+function openSettings(){}
+function closeSettings(){}
+function saveSettings(){}
+
+function resetAll(){
+  rawPunches=[];summaryRows=[];allSummaryRows=[];activeRows=[];employeeMap={};sourceFile='';
+  hideSaveBanner();
   document.getElementById('fi').value='';
   document.getElementById('up-err').innerHTML='';
   goTo(1);
