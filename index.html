@@ -1594,7 +1594,7 @@ async function writeToSheets() {
 
   // Build all 4 datasets
   const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
-  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now]);
+  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now,(r.all_punches||[]).join(',')]);  // all_punches as comma-separated
   const mrows=[];
   Object.values(employeeMap).forEach(emp=>{
     Object.entries(emp.monthly).forEach(([ym,M])=>{
@@ -2199,46 +2199,50 @@ function archBuildCutoffTable(rows, tableId, empId){
     const isNightOut=to!=='—'&&(t2m(to)>=22*60||t2m(to)<6*60);
     const dropKey=String(r.employee_id)+'-'+cleanDate(r.work_date).replace(/[-/]/g,'');
 
-    // Build tap list from available data
+    // Build tap list — use stored all_punches if available, else reconstruct from time_in/out
     let tapHtml='';
+    const storedPunches = String(r.all_punches||'').trim();
+    const punchTimes = storedPunches ? storedPunches.split(',').map(t=>t.trim()).filter(Boolean) : [];
+    const displayPunches = punchTimes.length >= 2 ? punchTimes : (pc===1 ? [ti] : pc>=2 ? [ti,...Array(pc-2).fill(null),to] : []);
+
     if(pc===0||ti==='—'){
       tapHtml='<div class="pd-punch-row"><div style="font-size:11px;color:var(--muted)">No punch data stored</div></div>';
-    } else if(pc===1){
-      tapHtml=`<div class="pd-punch-row">
-        <div class="pd-time ${isNightIn?'night':'in'}">${ti}</div>
-        <div class="pd-role ${isNightIn?'night':'in'}">${isNightIn?'night tap':'only tap'}</div>
-        <div style="font-size:10px;color:#E65100;margin-left:auto">⚠ single tap</div>
-      </div>`;
     } else {
-      // TIME IN
-      tapHtml+=`<div class="pd-punch-row">
-        <div class="pd-time ${isNightIn?'night':'in'}">${ti}</div>
-        <div class="pd-role in">TIME IN</div>
-        ${isNightIn?'<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>':''}
-      </div>`;
-      // Middle taps (if more than 2)
-      if(pc>2){
-        for(let mx=1;mx<pc-1;mx++){
-          tapHtml+=`<div class="pd-punch-row" style="opacity:.7">
-            <div class="pd-time mid">——</div>
-            <div class="pd-role mid">tap ${mx+1} of ${pc}</div>
-            <div style="font-size:10px;color:var(--muted);margin-left:auto">break punch</div>
-          </div>`;
+      displayPunches.forEach((t,pi)=>{
+        const isFirst=pi===0, isLast=pi===displayPunches.length-1 && displayPunches.length>1;
+        const actualTime = t || null;
+        const timeDisplay = actualTime || '——';
+        const isNight = actualTime && (t2m(actualTime)>=22*60||t2m(actualTime)<6*60);
+        let role, roleLabel, extraNote='';
+        if(isFirst && displayPunches.length===1){
+          role='in'; roleLabel='only tap';
+          extraNote='<div style="font-size:10px;color:#E65100;margin-left:auto">⚠ single tap</div>';
+        } else if(isFirst){
+          role=isNight?'night':'in'; roleLabel='TIME IN';
+          if(isNight)extraNote='<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>';
+        } else if(isLast){
+          role=isNight?'night':'out'; roleLabel='TIME OUT';
+          if(isNight)extraNote='<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>';
+        } else {
+          // Middle tap — break
+          const breakNum=pi; // 1-indexed break number
+          const isBreakOut=pi%2===1, isBreakIn=pi%2===0;
+          role=isNight?'night':'mid';
+          roleLabel=isBreakOut?`break out`:`break in`;
+          if(!actualTime)extraNote='<div style="font-size:10px;color:var(--muted);margin-left:auto">no time stored</div>';
+          if(isNight)extraNote='<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙</div>';
+          // Flag if this is the unpaired tap (odd punches)
+          if(pc%2!==0 && pi===Math.floor(pc/2)){
+            extraNote='<div style="font-size:10px;color:#E65100;margin-left:auto">⚠ unpaired</div>';
+          }
         }
-        if(pc%2!==0){
-          tapHtml+=`<div class="pd-punch-row" style="background:#FFFBF0">
-            <div class="pd-time mid" style="color:#E65100">——</div>
-            <div class="pd-role mid" style="background:#FFF3E0;color:#E65100">unpaired</div>
-            <div style="font-size:10px;color:#E65100;margin-left:auto">⚠ odd count</div>
-          </div>`;
-        }
-      }
-      // TIME OUT
-      tapHtml+=`<div class="pd-punch-row">
-        <div class="pd-time ${isNightOut?'night':'out'}">${to}</div>
-        <div class="pd-role out">TIME OUT</div>
-        ${isNightOut?'<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>':''}
-      </div>`;
+        const bgStyle = !actualTime ? 'opacity:.6;' : '';
+        tapHtml+=`<div class="pd-punch-row" style="${bgStyle}">
+          <div class="pd-time ${role}" style="${!actualTime?'color:var(--muted)':''}">${timeDisplay}</div>
+          <div class="pd-role ${role}">${roleLabel}</div>
+          ${extraNote}
+        </div>`;
+      });
     }
 
     // Cache punch data for this row so archToggleExpand can retrieve it
