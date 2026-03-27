@@ -2241,27 +2241,29 @@ function archBuildCutoffTable(rows, tableId, empId){
       </div>`;
     }
 
+    // Cache punch data for this row so archToggleExpand can retrieve it
+    if (!window._archPunchCache) window._archPunchCache = {};
+    window._archPunchCache[dropKey] = {
+      tapHtml, ti, to, total: r.total_hrs, rowData: {
+        employee_id:String(r.employee_id),
+        employee_name:String(r.employee_name),
+        work_date:cleanDate(r.work_date),
+        time_in:cleanTime(r.time_in),
+        time_out:cleanTime(r.time_out),
+        total_hrs:r.total_hrs, regular_hrs:r.regular_hrs,
+        ot_hrs:r.ot_hrs, nd_hrs:r.nd_hrs,
+        punch_count:r.punch_count, is_overnight:r.is_overnight,
+        cutoff_label:r.cutoff_label, flag
+      }
+    };
     return `<tr style="${rowStyle}">
-      <td style="position:relative;cursor:pointer" onclick="archToggleDrop('${dropKey}',this)">
+      <td style="cursor:pointer" onclick="archToggleExpand('${dropKey}',this)" title="Click to see punch timeline">
         <div style="display:flex;align-items:center;gap:5px">
           <div>
             <div style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600">${cleanDate(r.work_date)}</div>
-            <div style="font-size:10px;color:var(--muted);margin-top:1px">${pc} tap${pc!==1?'s':''}</div>
+            <div style="font-size:10px;color:${hasProblem?'#E65100':'var(--muted)'};margin-top:1px">${pc} tap${pc!==1?'s':''}${hasProblem?' ⚠':''}</div>
           </div>
-          <span style="font-size:9px;color:var(--muted);margin-left:2px" class="arch-drop-arrow-${dropKey}">▾</span>
-        </div>
-        <!-- Dropdown -->
-        <div class="punch-dropdown" id="arch-drop-${dropKey}" style="min-width:300px">
-          <div class="pd-header">
-            <span class="pd-hname">${cleanDate(r.work_date)} · ${getDayName(r.work_date)}</span>
-            <span class="pd-hdate">${pc} tap${pc!==1?'s':''} · ${r.total_hrs}h</span>
-          </div>
-          <div class="pd-punch-list">${tapHtml}</div>
-          <div class="pd-foot">
-            <div class="pd-total">${ti} → ${to} · ${r.total_hrs}h worked</div>
-            <button onclick="event.stopPropagation();closeAllNameDrops();openArchiveAdminModal(decodeURIComponent('${rEncoded}'))"
-              style="font-size:10px;background:var(--blue);color:white;border:none;border-radius:5px;padding:3px 10px;cursor:pointer">✎ Adjust</button>
-          </div>
+          <span id="arch-arr-${dropKey}" style="font-size:9px;color:var(--muted);margin-left:3px;transition:transform .15s;display:inline-block">▾</span>
         </div>
       </td>
       <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
@@ -2460,25 +2462,57 @@ function closeAllNameDrops() {
   document.querySelectorAll('.name-drop-btn.open').forEach(b => b.classList.remove('open'));
 }
 
-function archToggleDrop(key, cell) {
-  const drop = document.getElementById('arch-drop-' + key);
-  const arrow = cell.querySelector('.arch-drop-arrow-' + key);
-  if (!drop) return;
-  const isOpen = drop.classList.contains('open');
-  closeAllNameDrops();
-  if (!isOpen) {
-    drop.classList.add('open');
-    if (arrow) arrow.style.transform = 'rotate(180deg)';
-    if (arrow) arrow.style.color = 'var(--blue)';
-    setTimeout(() => {
-      document.addEventListener('click', () => {
-        drop.classList.remove('open');
-        if (arrow) arrow.style.transform = '';
-        if (arrow) arrow.style.color = '';
-      }, { once: true });
-    }, 10);
+
+// ── Archive punch expand row (no overflow clipping issue) ─────────
+function archToggleExpand(key, dateTd) {
+  const existing = document.getElementById('arch-exp-' + key);
+  const arrow    = document.getElementById('arch-arr-' + key);
+
+  if (existing) {
+    existing.remove();
+    if (arrow) { arrow.style.transform = ''; arrow.style.color = ''; }
+    return;
   }
+
+  const cache = window._archPunchCache?.[key];
+  if (!cache) return;
+  const { tapHtml, ti, to, total: totalHrs, rowData } = cache;
+
+  const parentTr = dateTd.closest('tr');
+  if (!parentTr) return;
+
+  const expandTr = document.createElement('tr');
+  expandTr.id = 'arch-exp-' + key;
+  expandTr.style.background = '#F0F7FF';
+  expandTr.innerHTML = `<td colspan="10" style="padding:0">
+    <div style="display:flex;border-top:2px solid var(--blue)">
+      <!-- Punch timeline -->
+      <div style="flex:1;padding:10px 14px;border-right:1px solid var(--rule)">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px">Punch Timeline</div>
+        <div style="display:flex;flex-direction:column;gap:2px">${tapHtml}</div>
+      </div>
+      <!-- Summary + actions -->
+      <div style="min-width:220px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;justify-content:center">
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--navy)"><span style="color:var(--green)">${ti}</span> → <span style="color:#E65100">${to}</span></div>
+        <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted)">${totalHrs} worked</div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button onclick="openArchiveAdminModal(this.dataset.row)" data-row='${rowData ? JSON.stringify(rowData).replace(/'/g, '&#39;') : '{}'}"
+            style="flex:1;background:var(--blue);color:white;border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:600;cursor:pointer">
+            ✎ Adjust Hours
+          </button>
+          <button onclick="document.getElementById('arch-exp-${key}').remove();document.getElementById('arch-arr-${key}').style.transform='';document.getElementById('arch-arr-${key}').style.color=''"
+            style="background:var(--sand);color:var(--muted);border:1px solid var(--rule);border-radius:6px;padding:6px 10px;font-size:11px;cursor:pointer">
+            ✕
+          </button>
+        </div>
+      </div>
+    </div>
+  </td>`;
+
+  parentTr.after(expandTr);
+  if (arrow) { arrow.style.transform = 'rotate(180deg)'; arrow.style.color = 'var(--blue)'; }
 }
+
 
 function togglePunchExpand(empId, workDate) {
   const id = 'pe-' + empId + '-' + workDate.replace(/\//g, '-');
