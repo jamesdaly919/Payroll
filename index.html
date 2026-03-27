@@ -2192,8 +2192,78 @@ function archBuildCutoffTable(rows, tableId, empId){
       cutoff_label:r.cutoff_label,
       flag
     }));
+    // Build punch timeline from stored time_in / time_out / punch_count
+    const pc=parseInt(r.punch_count)||0;
+    const ti=cleanTime(r.time_in), to=cleanTime(r.time_out);
+    const isNightIn=ti!=='—'&&(t2m(ti)>=22*60||t2m(ti)<6*60);
+    const isNightOut=to!=='—'&&(t2m(to)>=22*60||t2m(to)<6*60);
+    const dropKey=String(r.employee_id)+'-'+cleanDate(r.work_date).replace(/[-/]/g,'');
+
+    // Build tap list from available data
+    let tapHtml='';
+    if(pc===0||ti==='—'){
+      tapHtml='<div class="pd-punch-row"><div style="font-size:11px;color:var(--muted)">No punch data stored</div></div>';
+    } else if(pc===1){
+      tapHtml=`<div class="pd-punch-row">
+        <div class="pd-time ${isNightIn?'night':'in'}">${ti}</div>
+        <div class="pd-role ${isNightIn?'night':'in'}">${isNightIn?'night tap':'only tap'}</div>
+        <div style="font-size:10px;color:#E65100;margin-left:auto">⚠ single tap</div>
+      </div>`;
+    } else {
+      // TIME IN
+      tapHtml+=`<div class="pd-punch-row">
+        <div class="pd-time ${isNightIn?'night':'in'}">${ti}</div>
+        <div class="pd-role in">TIME IN</div>
+        ${isNightIn?'<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>':''}
+      </div>`;
+      // Middle taps (if more than 2)
+      if(pc>2){
+        for(let mx=1;mx<pc-1;mx++){
+          tapHtml+=`<div class="pd-punch-row" style="opacity:.7">
+            <div class="pd-time mid">——</div>
+            <div class="pd-role mid">tap ${mx+1} of ${pc}</div>
+            <div style="font-size:10px;color:var(--muted);margin-left:auto">break punch</div>
+          </div>`;
+        }
+        if(pc%2!==0){
+          tapHtml+=`<div class="pd-punch-row" style="background:#FFFBF0">
+            <div class="pd-time mid" style="color:#E65100">——</div>
+            <div class="pd-role mid" style="background:#FFF3E0;color:#E65100">unpaired</div>
+            <div style="font-size:10px;color:#E65100;margin-left:auto">⚠ odd count</div>
+          </div>`;
+        }
+      }
+      // TIME OUT
+      tapHtml+=`<div class="pd-punch-row">
+        <div class="pd-time ${isNightOut?'night':'out'}">${to}</div>
+        <div class="pd-role out">TIME OUT</div>
+        ${isNightOut?'<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙 night</div>':''}
+      </div>`;
+    }
+
     return `<tr style="${rowStyle}">
-      <td style="font-family:'DM Mono',monospace;font-size:11px">${cleanDate(r.work_date)}</td>
+      <td style="position:relative;cursor:pointer" onclick="archToggleDrop('${dropKey}',this)">
+        <div style="display:flex;align-items:center;gap:5px">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:11px;font-weight:600">${cleanDate(r.work_date)}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px">${pc} tap${pc!==1?'s':''}</div>
+          </div>
+          <span style="font-size:9px;color:var(--muted);margin-left:2px" class="arch-drop-arrow-${dropKey}">▾</span>
+        </div>
+        <!-- Dropdown -->
+        <div class="punch-dropdown" id="arch-drop-${dropKey}" style="min-width:300px">
+          <div class="pd-header">
+            <span class="pd-hname">${cleanDate(r.work_date)} · ${getDayName(r.work_date)}</span>
+            <span class="pd-hdate">${pc} tap${pc!==1?'s':''} · ${r.total_hrs}h</span>
+          </div>
+          <div class="pd-punch-list">${tapHtml}</div>
+          <div class="pd-foot">
+            <div class="pd-total">${ti} → ${to} · ${r.total_hrs}h worked</div>
+            <button onclick="event.stopPropagation();closeAllNameDrops();openArchiveAdminModal(decodeURIComponent('${rEncoded}'))"
+              style="font-size:10px;background:var(--blue);color:white;border:none;border-radius:5px;padding:3px 10px;cursor:pointer">✎ Adjust</button>
+          </div>
+        </div>
+      </td>
       <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${cleanTime(r.time_in)}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${cleanTime(r.time_out)}</td>
@@ -2201,7 +2271,7 @@ function archBuildCutoffTable(rows, tableId, empId){
       <td class="num">${r.regular_hrs}h</td>
       <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
       <td class="num" style="color:var(--purple)">${parseFloat(r.nd_hrs)>0?r.nd_hrs+'h':'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.punch_count}${hasProblem?'<span style="color:#E65100"> ⚠</span>':''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${pc}${hasProblem?'<span style="color:#E65100"> ⚠</span>':''}</td>
       <td style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px 8px">${badges.join(' ')}
         <button class="arch-edit-btn${hasProblem?' flagged':''}" onclick="openArchiveAdminModal(decodeURIComponent('${rEncoded}'))">✎ Adjust</button>
       </td>
@@ -2388,6 +2458,26 @@ function toggleNameDrop(empId, workDate, btn) {
 function closeAllNameDrops() {
   document.querySelectorAll('.punch-dropdown.open').forEach(d => d.classList.remove('open'));
   document.querySelectorAll('.name-drop-btn.open').forEach(b => b.classList.remove('open'));
+}
+
+function archToggleDrop(key, cell) {
+  const drop = document.getElementById('arch-drop-' + key);
+  const arrow = cell.querySelector('.arch-drop-arrow-' + key);
+  if (!drop) return;
+  const isOpen = drop.classList.contains('open');
+  closeAllNameDrops();
+  if (!isOpen) {
+    drop.classList.add('open');
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+    if (arrow) arrow.style.color = 'var(--blue)';
+    setTimeout(() => {
+      document.addEventListener('click', () => {
+        drop.classList.remove('open');
+        if (arrow) arrow.style.transform = '';
+        if (arrow) arrow.style.color = '';
+      }, { once: true });
+    }, 10);
+  }
 }
 
 function togglePunchExpand(empId, workDate) {
