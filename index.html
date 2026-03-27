@@ -1863,7 +1863,7 @@ let archiveLoaded=false;
 
 function openArchive(){
   document.getElementById('archive-overlay').classList.add('open');
-  if(!archiveLoaded)refreshArchive();
+  refreshArchive(); // always re-fetch so re-saved data shows immediately
 }
 function closeArchive(){document.getElementById('archive-overlay').classList.remove('open');}
 
@@ -1881,7 +1881,8 @@ async function refreshArchive(){
       total_hrs:r.total_hrs, regular_hrs:r.regular_hrs,
       ot_hrs:r.ot_hrs, nd_hrs:r.nd_hrs,
       is_overnight:r.is_overnight?'TRUE':'FALSE',
-      punch_count:r.punch_count, cutoff_label:r.cutoff_label
+      punch_count:r.punch_count, cutoff_label:r.cutoff_label,
+      all_punches:(r.all_punches||[]).join(',')
     }));
     archiveData.monthly=[];
     archiveData.weekly=[];
@@ -3120,10 +3121,9 @@ async function refreshPayrollTab() {
   statusEl.textContent = 'Loading…';
 
   // Use already-loaded archiveData if available, else fetch
-  if (!archiveLoaded || !archiveData.daily.length) {
-    bodyEl.innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted)">Loading from Google Sheets…</div>';
-    await refreshArchive();
-  }
+  // Always refresh to get latest data
+  bodyEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--muted)">Loading payroll data…</div>';
+  await refreshArchive();
 
   if (!archiveData.daily.length) {
     statusEl.textContent = 'No data';
