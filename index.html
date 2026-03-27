@@ -427,6 +427,31 @@ table.roster-tbl tfoot td.num{text-align:right;font-family:'DM Mono',monospace}
 .rate-cell-wrap input:focus{outline:2px solid var(--blue);border-color:var(--blue);z-index:1}
 .rate-cell-wrap input.has-rate{color:var(--navy)}
 .rate-cell-wrap input.no-rate{color:var(--muted)}
+.rate-cell-wrap input.skip-rate{background:#F5F5F5;color:var(--muted);border-style:dashed}
+/* Skip row — admin/no-rate employees */
+table.roster-tbl tbody tr.admin-row{background:#FAFAFA;opacity:.72}
+table.roster-tbl tbody tr.admin-row:hover{opacity:1}
+table.roster-tbl tbody tr.admin-row td{color:var(--muted)}
+/* Better tabular number font throughout payroll tab */
+.payroll-body table td.num,
+.payroll-body table tfoot td.num,
+.payroll-body .psv,
+.payroll-body .pc-val,
+.payroll-body .pr-amt{
+  font-variant-numeric:tabular-nums;
+  letter-spacing:0.02em;
+}
+/* Larger, clearer peso values */
+table.roster-tbl tbody td.peso-total{
+  font-size:14px;
+  font-weight:800;
+  letter-spacing:0;
+  font-variant-numeric:tabular-nums;
+}
+.payroll-summary-bar .psv{
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-0.01em;
+}
 
 /* Summary bar */
 .payroll-summary-bar{display:grid;grid-template-columns:repeat(5,1fr);background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:20px}
@@ -2911,7 +2936,8 @@ function renderPayrollTab(allCutoffs) {
   });
 
   // Totals
-  const withRate = sorted.filter(e => e.pay);
+  const withRate = sorted.filter(e => e.pay && !prIsSkipped(e.id));
+  const skippedCount = sorted.filter(e => prIsSkipped(e.id)).length;
   const grandReg  = r2(withRate.reduce((s, e) => s + (e.pay?.regPay    || 0), 0));
   const grandOT   = r2(withRate.reduce((s, e) => s + (e.pay?.otPremium || 0), 0));
   const grandND   = r2(withRate.reduce((s, e) => s + (e.pay?.ndPay     || 0), 0));
@@ -2929,10 +2955,19 @@ function renderPayrollTab(allCutoffs) {
     const hasPay = !!e.pay;
     const inputId = `pr-rate-${e.id}`;
     const nextId  = sorted[idx + 1] ? `pr-rate-${sorted[idx + 1].id}` : null;
-    return `<tr id="pr-row-${e.id}">
+    const isSkipped = prIsSkipped(e.id);
+    return `<tr id="pr-row-${e.id}" class="${isSkipped ? 'admin-row' : ''}">
       <td>
-        <div style="font-weight:600;color:var(--navy)">${e.name}</div>
-        <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">#${e.id}</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div>
+            <div style="font-weight:600;color:${isSkipped ? 'var(--muted)' : 'var(--navy)'}">${e.name}${isSkipped ? ' <span style="font-size:10px;background:#EEE;border-radius:3px;padding:1px 5px;color:#888;font-weight:500">admin</span>' : ''}</div>
+            <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">#${e.id}</div>
+          </div>
+          <button onclick="prToggleSkip('${e.id}')" title="${isSkipped ? 'Restore to roster' : 'Mark as admin — skip pay calculation'}"
+            style="margin-left:auto;background:none;border:1px solid ${isSkipped ? 'var(--green)' : 'var(--rule)'};border-radius:4px;padding:2px 7px;font-size:10px;cursor:pointer;color:${isSkipped ? 'var(--green)' : 'var(--muted)'}">
+            ${isSkipped ? '↩' : '✕'}
+          </button>
+        </div>
       </td>
       <td class="num">${e.days}</td>
       <td class="num">${e.totalHrs}h</td>
@@ -2944,18 +2979,19 @@ function renderPayrollTab(allCutoffs) {
           <span class="r-sym">₱</span>
           <input type="number" min="0" step="10"
             id="${inputId}"
-            class="${e.rate ? 'has-rate' : 'no-rate'}"
+            class="${e.rate ? 'has-rate' : (prIsSkipped(e.id) ? 'skip-rate' : 'no-rate')}"
             value="${e.rate || ''}"
-            placeholder="—"
+            placeholder="${prIsSkipped(e.id) ? 'skipped' : '—'}"
+            ${prIsSkipped(e.id) ? 'disabled title="Marked as admin/skip — click ✕ to restore"' : ''}
             onchange="prRateChange('${e.id}')"
-            onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();${nextId ? `document.getElementById('${nextId}').focus();document.getElementById('${nextId}').select()` : "document.getElementById('pr-rate-" + sorted[0].id + "').focus()"}}"
+            onkeydown="prNavKey(event,'${e.id}','${nextId || ''}','${sorted[0].id}')"
           >
         </div>
       </td>
       <td class="num" style="font-weight:700;color:var(--navy)">${hasPay ? peso(e.pay.regPay) : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="num" style="color:var(--blue);font-weight:${hasPay && e.pay.otPremium > 0 ? '700' : '400'}">${hasPay && e.pay.otPremium > 0 ? peso(e.pay.otPremium) : '<span style="color:var(--muted)">—</span>'}</td>
       <td class="num" style="color:var(--purple);font-weight:${hasPay && e.pay.ndPay > 0 ? '700' : '400'}">${hasPay && e.pay.ndPay > 0 ? peso(e.pay.ndPay) : '<span style="color:var(--muted)">—</span>'}</td>
-      <td class="num" style="font-size:14px;font-weight:800;color:${hasPay ? 'var(--green)' : 'var(--muted)'}">${hasPay ? peso(e.pay.total) : '—'}</td>
+      <td class="num peso-total" style="color:${hasPay ? 'var(--green)' : 'var(--muted)'}">${hasPay ? peso(e.pay.total) : '—'}</td>
     </tr>`;
   }).join('');
 
@@ -2977,10 +3013,12 @@ function renderPayrollTab(allCutoffs) {
       <div class="ps-cell grand"><div class="psl">Total Payroll</div><div class="psv">${peso(grandTot)}</div></div>
     </div>
 
-    ${noRate > 0 ? `<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5D4037">
-      ⚠ <strong>${noRate} employee${noRate > 1 ? 's' : ''}</strong> missing a daily rate — enter their rates below and press Enter to move to the next row.
-      Rates are saved automatically.
-    </div>` : ''}
+    ${(() => {
+      const missing = sorted.filter(e => !e.rate && !prIsSkipped(e.id));
+      return missing.length > 0 ? `<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5D4037">
+        ⚠ <strong>${missing.length} employee${missing.length > 1 ? 's' : ''}</strong> still need a daily rate. Press Enter to move between fields. Use <strong>✕</strong> next to a name to mark them as admin and skip them.
+      </div>` : '';
+    })()}
 
     <!-- Roster table -->
     <div class="roster-wrap">
@@ -3000,7 +3038,7 @@ function renderPayrollTab(allCutoffs) {
         </tr></thead>
         <tbody>${tableRows}</tbody>
         <tfoot><tr>
-          <td>TOTAL (${withRate.length} with rate)</td>
+          <td>TOTAL (${withRate.length} staff · ${skippedCount > 0 ? skippedCount + ' admin skipped' : 'all included'})</td>
           <td colspan="5"></td>
           <td></td>
           <td class="num">${peso(grandReg)}</td>
@@ -3024,6 +3062,58 @@ function renderPayrollTab(allCutoffs) {
       if (inp) inp.focus();
     }
   }, 80);
+}
+
+// ── Payroll tab: skip/admin rows ─────────────────────────────────
+const PR_SKIP_KEY = 'phpayroll_skip_v1';
+
+function prLoadSkipped() {
+  try { return JSON.parse(localStorage.getItem(PR_SKIP_KEY) || '[]'); }
+  catch { return []; }
+}
+function prIsSkipped(empId) {
+  return prLoadSkipped().includes(String(empId));
+}
+function prToggleSkip(empId) {
+  const list = prLoadSkipped();
+  const idx = list.indexOf(String(empId));
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push(String(empId));
+  localStorage.setItem(PR_SKIP_KEY, JSON.stringify(list));
+  // Re-render
+  const allCutoffs = [...new Set(archiveData.daily.map(r => String(r.cutoff_label)))].sort();
+  renderPayrollTab(allCutoffs);
+}
+
+// Navigate between rate inputs on Enter/Tab — never forces a value
+function prNavKey(event, empId, nextId, firstId) {
+  if (event.key !== 'Enter' && event.key !== 'Tab') return;
+  event.preventDefault();
+  // Save whatever is currently in the field first
+  const inp = document.getElementById('pr-rate-' + empId);
+  if (inp && !inp.disabled) {
+    const rate = parseFloat(inp.value) || 0;
+    paySaveRate(empId, rate);
+    inp.className = rate ? 'has-rate' : 'no-rate';
+  }
+  // Move to next non-skipped, non-disabled input
+  const target = nextId || firstId;
+  if (target) {
+    // Find next enabled input starting from target
+    const allInputs = [...document.querySelectorAll('input[id^="pr-rate-"]')];
+    const targetEl = document.getElementById('pr-rate-' + target);
+    let focusIdx = allInputs.indexOf(targetEl);
+    if (focusIdx < 0) focusIdx = 0;
+    // Cycle through until we find an enabled one (or wrap around)
+    for (let i = 0; i < allInputs.length; i++) {
+      const inp = allInputs[(focusIdx + i) % allInputs.length];
+      if (!inp.disabled) {
+        inp.focus();
+        inp.select();
+        break;
+      }
+    }
+  }
 }
 
 function prRateChange(empId) {
