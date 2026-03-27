@@ -386,6 +386,57 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 .pay-row .pr-zero{color:var(--muted);font-weight:400}
 .pay-no-rate{padding:20px 16px;text-align:center;color:var(--muted);font-size:13px}
 @media(max-width:800px){.pay-grid{grid-template-columns:repeat(3,1fr)}.pay-cell.total-cell{grid-column:span 1}}
+
+/* ── PAYROLL TAB ── */
+.payroll-overlay{display:none;position:fixed;inset:0;background:var(--cream);z-index:200;flex-direction:column;overflow:hidden}
+.payroll-overlay.open{display:flex}
+.payroll-topbar{background:var(--navy);padding:0 24px;height:52px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+.payroll-topbar h2{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:white;margin-right:auto}
+.payroll-body{flex:1;overflow-y:auto;padding:24px}
+
+/* Period selector */
+.period-pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.period-pill{padding:6px 14px;border-radius:20px;border:1px solid var(--rule);background:white;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s;color:var(--muted)}
+.period-pill:hover{border-color:var(--blue);color:var(--blue);background:var(--lt-blue)}
+.period-pill.active{background:var(--navy);color:white;border-color:var(--navy)}
+
+/* Roster table */
+.roster-wrap{background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+table.roster-tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.roster-tbl thead tr{background:var(--navy)}
+table.roster-tbl thead th{padding:11px 14px;text-align:left;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,.65);border-right:1px solid rgba(255,255,255,.06);white-space:nowrap;font-weight:500}
+table.roster-tbl thead th.num{text-align:right}
+table.roster-tbl thead th.sortable-h{cursor:pointer}
+table.roster-tbl thead th.sortable-h:hover{color:white}
+table.roster-tbl thead th.sort-asc-h::after{content:' ↑';color:var(--gold)}
+table.roster-tbl thead th.sort-desc-h::after{content:' ↓';color:var(--gold)}
+table.roster-tbl tbody tr{border-bottom:1px solid var(--rule);transition:background .1s}
+table.roster-tbl tbody tr:hover{background:#FAFBFF}
+table.roster-tbl tbody tr:last-child{border-bottom:none}
+table.roster-tbl tbody td{padding:9px 14px;vertical-align:middle}
+table.roster-tbl tbody td.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px}
+table.roster-tbl tbody td.zero{color:var(--muted)}
+table.roster-tbl tfoot tr{background:var(--sand);border-top:2px solid var(--rule)}
+table.roster-tbl tfoot td{padding:11px 14px;font-weight:700;font-size:13px}
+table.roster-tbl tfoot td.num{text-align:right;font-family:'DM Mono',monospace}
+
+/* Rate input in table */
+.rate-cell-wrap{display:flex;align-items:center;gap:0}
+.rate-cell-wrap .r-sym{font-size:12px;color:var(--muted);background:var(--sand);border:1px solid var(--rule);border-right:none;padding:5px 8px;border-radius:5px 0 0 5px;line-height:1;height:32px;display:flex;align-items:center}
+.rate-cell-wrap input{width:90px;border-radius:0 5px 5px 0;border:1px solid var(--rule);font-size:13px;font-weight:600;color:var(--navy);padding:5px 8px;font-family:'DM Mono',monospace;height:32px;background:white}
+.rate-cell-wrap input:focus{outline:2px solid var(--blue);border-color:var(--blue);z-index:1}
+.rate-cell-wrap input.has-rate{color:var(--navy)}
+.rate-cell-wrap input.no-rate{color:var(--muted)}
+
+/* Summary bar */
+.payroll-summary-bar{display:grid;grid-template-columns:repeat(5,1fr);background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:20px}
+.ps-cell{padding:14px 16px;border-right:1px solid var(--rule)}
+.ps-cell:last-child{border-right:none}
+.ps-cell .psl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px}
+.ps-cell .psv{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy)}
+.ps-cell.grand .psv{color:var(--green);font-size:24px}
+@media(max-width:900px){.payroll-summary-bar{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:600px){.payroll-summary-bar{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -393,7 +444,7 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="logo">PH<span>Payroll</span></div>
-  <div class="topbar-right"><button class="btn-sm" onclick="openArchive()">📂 Archive</button></div>
+  <div class="topbar-right"><button class="btn-sm" onclick="openPayrollTab()">💰 Payroll</button><button class="btn-sm" onclick="openArchive()">📂 Archive</button></div>
 </div>
 
 <!-- STEPS -->
@@ -2761,6 +2812,251 @@ function applyArchiveAdminEdit() {
   setTimeout(() => showToast('⚠ Changes are in-memory — export to Sheets to persist'), 3500);
 }
 
+// ══════════════════════════════════════════════════════════════════
+// PAYROLL TAB — Roster-level pay calculator
+// ══════════════════════════════════════════════════════════════════
+let _prCutoff = '';       // currently selected cutoff
+let _prSort   = { col: 'name', dir: 'asc' };
+
+function openPayrollTab() {
+  document.getElementById('payroll-overlay').classList.add('open');
+  refreshPayrollTab();
+}
+function closePayrollTab() {
+  document.getElementById('payroll-overlay').classList.remove('open');
+}
+
+async function refreshPayrollTab() {
+  const statusEl = document.getElementById('pr-conn-status');
+  const bodyEl   = document.getElementById('payroll-body');
+  statusEl.textContent = 'Loading…';
+
+  // Use already-loaded archiveData if available, else fetch
+  if (!archiveLoaded || !archiveData.daily.length) {
+    bodyEl.innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted)">Loading from Google Sheets…</div>';
+    await refreshArchive();
+  }
+
+  if (!archiveData.daily.length) {
+    statusEl.textContent = 'No data';
+    bodyEl.innerHTML = `<div style="text-align:center;padding:60px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:12px">📭</div>
+      No payroll data found in Google Sheets yet.<br>
+      Process and save a cutoff first, then come back here.
+    </div>`;
+    return;
+  }
+
+  // Build list of all cutoffs
+  const allCutoffs = [...new Set(archiveData.daily.map(r => String(r.cutoff_label)))].sort();
+  if (!_prCutoff || !allCutoffs.includes(_prCutoff)) {
+    _prCutoff = allCutoffs[allCutoffs.length - 1]; // default to latest
+  }
+
+  statusEl.textContent = archiveData.daily.length + ' records loaded';
+  renderPayrollTab(allCutoffs);
+}
+
+function renderPayrollTab(allCutoffs) {
+  const bodyEl = document.getElementById('payroll-body');
+
+  // Get rows for selected cutoff
+  const rows = archiveData.daily.filter(r => String(r.cutoff_label) === _prCutoff);
+
+  // Build roster: one entry per employee in this cutoff
+  const empMap = {};
+  rows.forEach(r => {
+    const id = String(r.employee_id);
+    if (!empMap[id]) {
+      empMap[id] = {
+        id, name: String(r.employee_name),
+        days: 0, regHrs: 0, otHrs: 0, ndHrs: 0, totalHrs: 0
+      };
+    }
+    empMap[id].days     += (parseFloat(r.total_hrs) || 0) > 0 ? 1 : 0;
+    empMap[id].regHrs   += parseFloat(r.regular_hrs) || 0;
+    empMap[id].otHrs    += parseFloat(r.ot_hrs)      || 0;
+    empMap[id].ndHrs    += parseFloat(r.nd_hrs)      || 0;
+    empMap[id].totalHrs += parseFloat(r.total_hrs)   || 0;
+  });
+
+  // Round and attach saved rates + compute pay
+  const roster = Object.values(empMap).map(e => {
+    const rate = payGetRate(e.id) || 0;
+    e.regHrs   = r2(e.regHrs);
+    e.otHrs    = r2(e.otHrs);
+    e.ndHrs    = r2(e.ndHrs);
+    e.totalHrs = r2(e.totalHrs);
+    e.rate     = rate;
+    e.pay      = rate ? payCompute(rows.filter(r => String(r.employee_id) === e.id), rate) : null;
+    return e;
+  });
+
+  // Sort
+  const sorted = [...roster].sort((a, b) => {
+    let va, vb;
+    switch (_prSort.col) {
+      case 'name':    va = a.name;     vb = b.name;     break;
+      case 'rate':    va = a.rate;     vb = b.rate;     break;
+      case 'total':   va = a.pay?.total   || 0; vb = b.pay?.total   || 0; break;
+      case 'reg':     va = a.pay?.regPay  || 0; vb = b.pay?.regPay  || 0; break;
+      case 'ot':      va = a.pay?.otPremium || 0; vb = b.pay?.otPremium || 0; break;
+      case 'nd':      va = a.pay?.ndPay   || 0; vb = b.pay?.ndPay   || 0; break;
+      case 'days':    va = a.days;     vb = b.days;     break;
+      case 'hrs':     va = a.totalHrs; vb = b.totalHrs; break;
+      default:        va = a.name;     vb = b.name;
+    }
+    if (typeof va === 'string') return _prSort.dir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _prSort.dir === 'asc' ? va - vb : vb - va;
+  });
+
+  // Totals
+  const withRate = sorted.filter(e => e.pay);
+  const grandReg  = r2(withRate.reduce((s, e) => s + (e.pay?.regPay    || 0), 0));
+  const grandOT   = r2(withRate.reduce((s, e) => s + (e.pay?.otPremium || 0), 0));
+  const grandND   = r2(withRate.reduce((s, e) => s + (e.pay?.ndPay     || 0), 0));
+  const grandTot  = r2(withRate.reduce((s, e) => s + (e.pay?.total     || 0), 0));
+  const noRate    = sorted.filter(e => !e.pay).length;
+
+  const peso = n => '₱' + (n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const th = (col, label, num = false) => {
+    const active = _prSort.col === col;
+    const cls = `sortable-h${num ? ' num' : ''} ${active ? 'sort-' + _prSort.dir + '-h' : ''}`;
+    return `<th class="${cls}" onclick="prSort('${col}')">${label}</th>`;
+  };
+
+  const tableRows = sorted.map((e, idx) => {
+    const hasPay = !!e.pay;
+    const inputId = `pr-rate-${e.id}`;
+    const nextId  = sorted[idx + 1] ? `pr-rate-${sorted[idx + 1].id}` : null;
+    return `<tr id="pr-row-${e.id}">
+      <td>
+        <div style="font-weight:600;color:var(--navy)">${e.name}</div>
+        <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">#${e.id}</div>
+      </td>
+      <td class="num">${e.days}</td>
+      <td class="num">${e.totalHrs}h</td>
+      <td class="num">${e.regHrs}h</td>
+      <td class="num" style="color:var(--blue)">${e.otHrs > 0 ? e.otHrs + 'h' : '–'}</td>
+      <td class="num" style="color:var(--purple)">${e.ndHrs > 0 ? e.ndHrs + 'h' : '–'}</td>
+      <td>
+        <div class="rate-cell-wrap">
+          <span class="r-sym">₱</span>
+          <input type="number" min="0" step="10"
+            id="${inputId}"
+            class="${e.rate ? 'has-rate' : 'no-rate'}"
+            value="${e.rate || ''}"
+            placeholder="—"
+            onchange="prRateChange('${e.id}')"
+            onkeydown="if(event.key==='Enter'||event.key==='Tab'){event.preventDefault();${nextId ? `document.getElementById('${nextId}').focus();document.getElementById('${nextId}').select()` : "document.getElementById('pr-rate-" + sorted[0].id + "').focus()"}}"
+          >
+        </div>
+      </td>
+      <td class="num" style="font-weight:700;color:var(--navy)">${hasPay ? peso(e.pay.regPay) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num" style="color:var(--blue);font-weight:${hasPay && e.pay.otPremium > 0 ? '700' : '400'}">${hasPay && e.pay.otPremium > 0 ? peso(e.pay.otPremium) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num" style="color:var(--purple);font-weight:${hasPay && e.pay.ndPay > 0 ? '700' : '400'}">${hasPay && e.pay.ndPay > 0 ? peso(e.pay.ndPay) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="num" style="font-size:14px;font-weight:800;color:${hasPay ? 'var(--green)' : 'var(--muted)'}">${hasPay ? peso(e.pay.total) : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  bodyEl.innerHTML = `
+    <!-- Period selector -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted)">Pay Period</div>
+      <div class="period-pill-row" style="margin-bottom:0">
+        ${allCutoffs.map(c => `<div class="period-pill${c === _prCutoff ? ' active' : ''}" onclick="prSetCutoff('${c.replace(/'/g,"\\'")}',${JSON.stringify(allCutoffs)})">${c}</div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Summary bar -->
+    <div class="payroll-summary-bar">
+      <div class="ps-cell"><div class="psl">Employees</div><div class="psv">${sorted.length}</div></div>
+      <div class="ps-cell"><div class="psl">Regular Pay</div><div class="psv" style="color:var(--navy);font-size:16px">${peso(grandReg)}</div></div>
+      <div class="ps-cell"><div class="psl">OT Premium</div><div class="psv" style="color:var(--blue);font-size:16px">${peso(grandOT)}</div></div>
+      <div class="ps-cell"><div class="psl">Night Diff</div><div class="psv" style="color:var(--purple);font-size:16px">${peso(grandND)}</div></div>
+      <div class="ps-cell grand"><div class="psl">Total Payroll</div><div class="psv">${peso(grandTot)}</div></div>
+    </div>
+
+    ${noRate > 0 ? `<div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5D4037">
+      ⚠ <strong>${noRate} employee${noRate > 1 ? 's' : ''}</strong> missing a daily rate — enter their rates below and press Enter to move to the next row.
+      Rates are saved automatically.
+    </div>` : ''}
+
+    <!-- Roster table -->
+    <div class="roster-wrap">
+      <table class="roster-tbl">
+        <thead><tr>
+          ${th('name','Employee')}
+          ${th('days','Days',true)}
+          ${th('hrs','Total Hrs',true)}
+          ${th('reg','Reg Hrs',true)}
+          ${th('ot','OT Hrs',true)}
+          ${th('nd','ND Hrs',true)}
+          <th>Daily Rate</th>
+          ${th('reg','Reg Pay',true)}
+          ${th('ot','OT Premium',true)}
+          ${th('nd','Night Diff',true)}
+          ${th('total','Total',true)}
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+        <tfoot><tr>
+          <td>TOTAL (${withRate.length} with rate)</td>
+          <td colspan="5"></td>
+          <td></td>
+          <td class="num">${peso(grandReg)}</td>
+          <td class="num" style="color:var(--blue)">${peso(grandOT)}</td>
+          <td class="num" style="color:var(--purple)">${peso(grandND)}</td>
+          <td class="num" style="font-size:15px;color:var(--green)">${peso(grandTot)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-top:12px;font-family:'DM Mono',monospace;line-height:1.8">
+      Regular = hours × (rate ÷ 8) · OT premium = OT hours × (rate ÷ 8) × 0.25 · Night diff = ND hours × (rate ÷ 8) × 0.10
+      · Per DOLE standard · Rates auto-saved to browser
+    </div>`;
+
+  // Focus first empty rate input
+  setTimeout(() => {
+    const first = sorted.find(e => !e.rate);
+    if (first) {
+      const inp = document.getElementById('pr-rate-' + first.id);
+      if (inp) inp.focus();
+    }
+  }, 80);
+}
+
+function prRateChange(empId) {
+  const inp = document.getElementById('pr-rate-' + empId);
+  if (!inp) return;
+  const rate = parseFloat(inp.value) || 0;
+  paySaveRate(empId, rate);
+  inp.className = rate ? 'has-rate' : 'no-rate';
+  // Re-render to update totals (debounced)
+  clearTimeout(window._prRenderTimer);
+  window._prRenderTimer = setTimeout(() => {
+    const allCutoffs = [...new Set(archiveData.daily.map(r => String(r.cutoff_label)))].sort();
+    renderPayrollTab(allCutoffs);
+    // Restore focus to same input after re-render
+    setTimeout(() => {
+      const restored = document.getElementById('pr-rate-' + empId);
+      if (restored) { restored.focus(); restored.select(); }
+    }, 30);
+  }, 400);
+}
+
+function prSort(col) {
+  _prSort.dir = _prSort.col === col ? (_prSort.dir === 'asc' ? 'desc' : 'asc') : 'asc';
+  _prSort.col = col;
+  const allCutoffs = [...new Set(archiveData.daily.map(r => String(r.cutoff_label)))].sort();
+  renderPayrollTab(allCutoffs);
+}
+
+function prSetCutoff(cutoff, allCutoffs) {
+  _prCutoff = cutoff;
+  renderPayrollTab(allCutoffs);
+}
+
 console.log("PH Payroll v4 loaded — single panel-1 ✓");
 function openSettings(){}
 function closeSettings(){}
@@ -2934,6 +3230,20 @@ function resetAll(){
       <button class="btn btn-ghost" onclick="closeArchiveAdminModal()">Cancel</button>
       <button class="btn btn-confirm" onclick="applyArchiveAdminEdit()" style="padding:9px 24px">✓ Save Adjustment</button>
     </div>
+  </div>
+</div>
+
+
+<!-- ═══ PAYROLL TAB OVERLAY ═══ -->
+<div class="payroll-overlay" id="payroll-overlay">
+  <div class="payroll-topbar">
+    <h2>💰 Payroll Calculator</h2>
+    <div id="pr-conn-status" style="font-size:12px;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace"></div>
+    <button class="btn-sm" onclick="refreshPayrollTab()" style="margin-left:8px">🔄 Refresh</button>
+    <button class="btn-sm" onclick="closePayrollTab()" style="background:white;color:var(--navy);font-weight:600">← Back to Tool</button>
+  </div>
+  <div class="payroll-body" id="payroll-body">
+    <div style="text-align:center;padding:60px 20px;color:var(--muted)">Loading payroll data…</div>
   </div>
 </div>
 
