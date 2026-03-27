@@ -1360,9 +1360,34 @@ async function writeToSheets() {
   const bar=document.getElementById('prog-bar');
   const fill=document.getElementById('prog-fill');
   const msg=document.getElementById('status-msg');
-  btn.disabled=true; btn.textContent='Saving…'; bar.classList.add('active');
   const now=new Date().toISOString();
   const cutoff=allSummaryRows[0]?.cutoff_label||'';
+
+  // Check if this cutoff already exists in Sheets before writing
+  msg.textContent='Checking for existing data…';
+  bar.classList.add('active'); fill.style.width='10%';
+  try{
+    const chkResp=await fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'check_cutoff',cutoff_label:cutoff})});
+    if(chkResp.ok){
+      const chk=await chkResp.json();
+      if(chk.status==='ok'&&chk.exists){
+        // Already saved — confirm overwrite
+        const confirmed=confirm(
+          'Cutoff "'+cutoff+'" is already saved in Google Sheets ('+chk.count+' rows found).\n\n'+
+          'The old data will be REPLACED with this upload.\n\n'+
+          'Continue? Click OK to overwrite, Cancel to stop.'
+        );
+        if(!confirmed){
+          btn.disabled=false; btn.textContent='✓ Save to Google Sheets';
+          bar.classList.remove('active'); fill.style.width='0%';
+          msg.textContent=''; msg.className='status-msg';
+          return;
+        }
+      }
+    }
+  }catch(e){/* network error — proceed anyway, server-side dedup will handle it */}
+
+  btn.disabled=true; btn.textContent='Saving…';
 
   // Build all 4 datasets
   const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
@@ -1386,6 +1411,7 @@ async function writeToSheets() {
       method:'POST',
       body:JSON.stringify({
         action:'write_all',
+        cutoff_label:cutoff,
         sheets:{
           '03_RawPunches':rawRows,
           '04_DailySummary':dailyRows,
@@ -1410,6 +1436,17 @@ async function writeToSheets() {
     msg.className='status-msg err';
     btn.disabled=false; btn.textContent='✓ Save to Google Sheets';
   }
+}
+
+// Deduplicate archive rows by composite key — keeps last occurrence
+function dedupeArchiveRows(rows, keyFields){
+  const seen={};
+  const result=[];
+  for(let i=rows.length-1;i>=0;i--){
+    const key=keyFields.map(f=>String(rows[i][f]||'')).join('||');
+    if(!seen[key]){seen[key]=true;result.unshift(rows[i]);}
+  }
+  return result;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1474,12 +1511,12 @@ async function refreshArchive(){
     }
 
     const fromSheets={
-      daily:data.daily_summary||[],
-      monthly:data.employee_monthly||[],
-      weekly:data.employee_weekly||[]
+      daily:dedupeArchiveRows(data.daily_summary||[],   ['employee_id','work_date']),
+      monthly:dedupeArchiveRows(data.employee_monthly||[],['employee_id','year_month']),
+      weekly:dedupeArchiveRows(data.employee_weekly||[], ['employee_id','week_label'])
     };
 
-    // Merge: prefer Sheets data, supplement with local session data
+    // Merge: prefer Sheets data
     if(fromSheets.daily.length>0){
       archiveData=fromSheets;
     }
