@@ -355,6 +355,37 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 .punch-role-badge{font-size:10px;border-radius:4px;padding:2px 8px;font-family:'DM Mono',monospace;font-weight:600}
 .role-in{background:#E8F5EE;color:var(--green)}.role-out{background:#FFF3E0;color:#E65100}.role-mid{background:var(--sand);color:var(--muted)}
 
+
+/* ── PAYROLL CALCULATOR ── */
+.pay-section{border-top:2px solid var(--rule);background:linear-gradient(135deg,#FAFBFF 0%,#F0F7FF 100%)}
+.pay-section-hd{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pay-rate-input{display:flex;align-items:center;gap:8px}
+.pay-rate-input .peso-sym{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--muted);background:var(--sand);border:1px solid var(--rule);border-right:none;padding:6px 10px;border-radius:6px 0 0 6px;line-height:1}
+.pay-rate-input input{width:100px;border-radius:0 6px 6px 0;border:1px solid var(--rule);font-size:14px;font-weight:700;color:var(--navy);padding:6px 10px;font-family:'DM Mono',monospace;min-height:34px}
+.pay-rate-input input:focus{outline:2px solid var(--blue);border-color:var(--blue)}
+.pay-body{padding:14px 16px 16px}
+.pay-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px}
+.pay-cell{background:white;border:1px solid var(--rule);border-radius:8px;padding:11px 12px}
+.pay-cell .pc-lbl{font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:5px}
+.pay-cell .pc-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy)}
+.pay-cell .pc-sub{font-size:10px;color:var(--muted);margin-top:3px;font-family:'DM Mono',monospace}
+.pay-cell.total-cell{background:var(--navy);border-color:var(--navy);grid-column:span 2}
+.pay-cell.total-cell .pc-lbl{color:rgba(255,255,255,.6)}
+.pay-cell.total-cell .pc-val{color:white;font-size:24px}
+.pay-cell.total-cell .pc-sub{color:rgba(255,255,255,.5)}
+.pay-cell.ot-cell .pc-val{color:var(--blue)}
+.pay-cell.nd-cell .pc-val{color:var(--purple)}
+.pay-breakdown{border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.pay-row{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--rule);font-size:12.5px}
+.pay-row:last-child{border-bottom:none}
+.pay-row.pay-total{background:var(--navy);color:white;font-weight:700;font-size:14px}
+.pay-row.pay-total .pr-amt{color:white}
+.pay-row .pr-lbl{color:var(--text2)}
+.pay-row .pr-sub{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:1px}
+.pay-row .pr-amt{font-family:'DM Mono',monospace;font-weight:700;font-size:13px;color:var(--navy)}
+.pay-row .pr-zero{color:var(--muted);font-weight:400}
+.pay-no-rate{padding:20px 16px;text-align:center;color:var(--muted);font-size:13px}
+@media(max-width:800px){.pay-grid{grid-template-columns:repeat(3,1fr)}.pay-cell.total-cell{grid-column:span 1}}
 </style>
 </head>
 <body>
@@ -1450,6 +1481,207 @@ function dedupeArchiveRows(rows, keyFields){
 }
 
 // ══════════════════════════════════════════════════════════════════
+// PAYROLL CALCULATOR
+// PH Labor Law rates:
+//   Regular: daily_rate / 8 per hour
+//   OT (regular day): hourly × 1.25
+//   Night Diff (22:00-06:00): hourly × 1.10 (extra 10%)
+//   Rest day OT: hourly × 1.30 (if needed later)
+// ══════════════════════════════════════════════════════════════════
+
+const PAY_RATES_KEY = 'phpayroll_daily_rates_v1';
+
+function payLoadRates() {
+  try { return JSON.parse(localStorage.getItem(PAY_RATES_KEY) || '{}'); }
+  catch { return {}; }
+}
+function paySaveRate(empId, rate) {
+  const rates = payLoadRates();
+  rates[String(empId)] = rate;
+  localStorage.setItem(PAY_RATES_KEY, JSON.stringify(rates));
+}
+function payGetRate(empId) {
+  return payLoadRates()[String(empId)] || 0;
+}
+
+// Compute pay breakdown for a set of daily rows + daily rate
+function payCompute(rows, dailyRate) {
+  const hr = dailyRate / 8; // hourly rate
+  let regHrs = 0, otHrs = 0, ndHrs = 0, days = 0;
+  rows.forEach(r => {
+    regHrs += parseFloat(r.regular_hrs) || 0;
+    otHrs  += parseFloat(r.ot_hrs)      || 0;
+    ndHrs  += parseFloat(r.nd_hrs)      || 0;
+    days   += (parseFloat(r.total_hrs) || 0) > 0 ? 1 : 0;
+  });
+  regHrs = r2(regHrs); otHrs = r2(otHrs); ndHrs = r2(ndHrs);
+
+  const regPay  = r2(regHrs  * hr);
+  const otPay   = r2(otHrs   * hr * 1.25);   // OT premium: base (1.0×) + 25% = 1.25×
+  const ndPay   = r2(ndHrs   * hr * 0.10);   // Night diff is extra 10% on those hours
+  // OT hours already include the base pay — just add the 25% premium
+  const otBase  = r2(otHrs   * hr);          // base pay for OT hours (already in reg)
+  const otPremium = r2(otHrs * hr * 0.25);   // just the premium portion
+  const total   = r2(regPay + otPremium + ndPay);
+
+  return { regHrs, otHrs, ndHrs, days, dailyRate, hr: r2(hr),
+           regPay, otPremium, ndPay, total };
+}
+
+function archBuildPaySection(rows, cid, empId, cutoff) {
+  const savedRate = payGetRate(empId);
+  const pid = cid + '_pay';
+
+  return `<div class="pay-section">
+    <div class="pay-section-hd">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted)">₱ Payroll</div>
+        <div class="pay-rate-input">
+          <span class="peso-sym">₱</span>
+          <input type="number" min="0" step="10"
+            placeholder="Daily rate"
+            value="${savedRate || ''}"
+            id="${pid}-rate"
+            oninput="payUpdateSection('${pid}','${empId}','${cid}')"
+            onchange="paySaveRate('${empId}',parseFloat(this.value)||0);payUpdateSection('${pid}','${empId}','${cid}')">
+        </div>
+        <span style="font-size:11px;color:var(--muted)">per day · auto-saved</span>
+      </div>
+      <div id="${pid}-total-badge" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy)"></div>
+    </div>
+    <div id="${pid}-body"></div>
+  </div>`;
+}
+
+// Store cutoff rows keyed by pid so the updater can access them
+const _payRowCache = {};
+
+function payUpdateSection(pid, empId, cid) {
+  // Get rows — try cache first, then find from archiveData
+  let rows = _payRowCache[cid];
+  if (!rows) {
+    rows = archiveData.daily.filter(r => {
+      const rCid = 'cc-' + String(r.cutoff_label).replace(/[|\s]/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
+      return rCid === cid && String(r.employee_id) === String(empId);
+    });
+    _payRowCache[cid] = rows;
+  }
+
+  const rateInput = document.getElementById(pid + '-rate');
+  const bodyEl    = document.getElementById(pid + '-body');
+  const badgeEl   = document.getElementById(pid + '-total-badge');
+  if (!rateInput || !bodyEl) return;
+
+  const rate = parseFloat(rateInput.value) || 0;
+
+  if (!rate) {
+    bodyEl.innerHTML = `<div class="pay-no-rate">Enter a daily rate above to compute pay for this cutoff</div>`;
+    if (badgeEl) badgeEl.textContent = '';
+    return;
+  }
+
+  const p = payCompute(rows, rate);
+  if (badgeEl) badgeEl.textContent = '₱' + p.total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  bodyEl.innerHTML = `
+    <div class="pay-body">
+      <!-- KPI summary row -->
+      <div class="pay-grid">
+        <div class="pay-cell">
+          <div class="pc-lbl">Daily Rate</div>
+          <div class="pc-val">₱${rate.toLocaleString()}</div>
+          <div class="pc-sub">₱${p.hr}/hr · ${p.days} days</div>
+        </div>
+        <div class="pay-cell">
+          <div class="pc-lbl">Regular Pay</div>
+          <div class="pc-val">₱${p.regPay.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+          <div class="pc-sub">${p.regHrs}h × ₱${p.hr}</div>
+        </div>
+        <div class="pay-cell ot-cell">
+          <div class="pc-lbl">OT Premium</div>
+          <div class="pc-val">₱${p.otPremium.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+          <div class="pc-sub">${p.otHrs}h × ₱${p.hr} × 25%</div>
+        </div>
+        <div class="pay-cell nd-cell">
+          <div class="pc-lbl">Night Diff</div>
+          <div class="pc-val">₱${p.ndPay.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+          <div class="pc-sub">${p.ndHrs}h × ₱${p.hr} × 10%</div>
+        </div>
+        <div class="pay-cell total-cell">
+          <div class="pc-lbl">Total This Cutoff</div>
+          <div class="pc-val">₱${p.total.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+          <div class="pc-sub">reg + OT premium + ND</div>
+        </div>
+      </div>
+
+      <!-- Detailed breakdown table -->
+      <div class="pay-breakdown">
+        <div class="pay-row" style="background:var(--sand)">
+          <div><div class="pr-lbl" style="font-weight:700;font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Pay Component</div></div>
+          <div style="font-weight:700;font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Hours</div>
+          <div style="font-weight:700;font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Rate</div>
+          <div style="font-weight:700;font-size:11px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px;color:var(--muted)">Amount</div>
+        </div>
+
+        <div class="pay-row">
+          <div><div class="pr-lbl">Regular Hours</div><div class="pr-sub">₱${p.hr}/hr × hours worked (≤8/day)</div></div>
+          <div class="pr-amt">${p.regHrs}h</div>
+          <div class="pr-amt">₱${p.hr}</div>
+          <div class="pr-amt">₱${p.regPay.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+
+        <div class="pay-row">
+          <div>
+            <div class="pr-lbl">Overtime Pay <span style="font-size:10px;color:var(--blue);font-weight:400">(base already in regular)</span></div>
+            <div class="pr-sub">₱${p.hr}/hr × ${p.otHrs}h × 1.25 total rate · premium portion only</div>
+          </div>
+          <div class="pr-amt" style="color:var(--blue)">${p.otHrs}h</div>
+          <div class="pr-amt" style="color:var(--blue)">+25%</div>
+          <div class="pr-amt" style="color:var(--blue)">${p.otHrs > 0 ? '₱' + p.otPremium.toLocaleString(undefined,{minimumFractionDigits:2}) : '<span class="pr-zero">—</span>'}</div>
+        </div>
+
+        <div class="pay-row">
+          <div>
+            <div class="pr-lbl">Night Differential <span style="font-size:10px;color:var(--purple);font-weight:400">(22:00–06:00)</span></div>
+            <div class="pr-sub">₱${p.hr}/hr × ${p.ndHrs}h × 10% extra</div>
+          </div>
+          <div class="pr-amt" style="color:var(--purple)">${p.ndHrs}h</div>
+          <div class="pr-amt" style="color:var(--purple)">+10%</div>
+          <div class="pr-amt" style="color:var(--purple)">${p.ndHrs > 0 ? '₱' + p.ndPay.toLocaleString(undefined,{minimumFractionDigits:2}) : '<span class="pr-zero">—</span>'}</div>
+        </div>
+
+        <div class="pay-row pay-total">
+          <div><div>Total Payable This Cutoff</div><div style="font-size:10px;font-weight:400;opacity:.7;margin-top:2px">${p.days} days worked · ${p.regHrs}h reg · ${p.otHrs}h OT · ${p.ndHrs}h ND</div></div>
+          <div></div>
+          <div></div>
+          <div class="pr-amt" style="font-size:16px">₱${p.total.toLocaleString(undefined,{minimumFractionDigits:2})}</div>
+        </div>
+      </div>
+
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;font-family:'DM Mono',monospace;line-height:1.8">
+        Formula: Regular (${p.regHrs}h × ₱${p.hr}) + OT premium (${p.otHrs}h × ₱${p.hr} × 0.25) + ND (${p.ndHrs}h × ₱${p.hr} × 0.10)
+        · Hourly rate = ₱${rate} ÷ 8 = ₱${p.hr} · Per DOLE standard computation
+      </div>
+    </div>`;
+}
+
+// Auto-render pay sections when employee view loads
+function payAutoRender(empId) {
+  // Called after selectArchiveEmployee renders the DOM
+  // Find all pay section inputs and trigger update
+  setTimeout(() => {
+    document.querySelectorAll('[id$="-rate"]').forEach(input => {
+      const pid = input.id.replace('-rate','');
+      const cid = pid.replace(/_pay$/,'');
+      if (payGetRate(empId) && !input.value) {
+        input.value = payGetRate(empId);
+      }
+      payUpdateSection(pid, empId, cid);
+    });
+  }, 50);
+}
+
+// ══════════════════════════════════════════════════════════════════
 // ARCHIVE SYSTEM
 // ══════════════════════════════════════════════════════════════════
 let archiveData={daily:[],monthly:[],weekly:[]};
@@ -1698,6 +1930,7 @@ function selectArchiveEmployee(empId){
       </div>
       <div class="cc-body" id="${cid}">
         ${archBuildCutoffTable(rows, cid, empId)}
+        ${archBuildPaySection(rows, cid, empId, cutoff)}
       </div>
     </div>`;
   });
