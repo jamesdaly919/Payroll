@@ -301,6 +301,17 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 table.arch-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
 table.arch-tbl thead th{text-align:left;padding:9px 12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--rule);white-space:nowrap}
 table.arch-tbl thead th.num{text-align:right}
+table.arch-tbl thead th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+table.arch-tbl thead th.sortable:hover{color:var(--navy);background:var(--lt-blue)}
+table.arch-tbl thead th.sort-asc::after{content:' ↑';color:var(--blue);font-size:9px}
+table.arch-tbl thead th.sort-desc::after{content:' ↓';color:var(--blue);font-size:9px}
+.ab-miss{background:#FEE2E2;color:#991B1B}
+.ab-odd{background:#FFF3E0;color:#92400E}
+.ab-edit{background:#E8F5EE;color:#065F46}
+.arch-edit-btn{background:none;border:1px solid var(--rule);border-radius:5px;padding:3px 8px;font-size:10px;color:var(--muted);cursor:pointer;font-family:'DM Mono',monospace;white-space:nowrap}
+.arch-edit-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--lt-blue)}
+.arch-edit-btn.flagged{border-color:#E65100;color:#E65100}
+.arch-admin-modal{background:white;border-radius:14px;padding:28px;width:100%;max-width:620px;box-shadow:0 20px 60px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto}
 table.arch-tbl tbody td{padding:8px 12px;border-bottom:1px solid #F5F0E8;vertical-align:middle}
 table.arch-tbl tbody td.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px}
 table.arch-tbl tbody tr:hover{background:#FAFBFF}
@@ -1640,55 +1651,164 @@ function selectArchiveEmployee(empId){
     const totOT=r2(rows.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
     const totND=r2(rows.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
     const cid='cc-'+cutoff.replace(/[|\s]/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
+    // Count flagged rows for header badge
+    const flagCount=rows.filter(r=>archGetRowFlag(r)!=='ok').length;
     html+=`<div class="cutoff-card-ar">
       <div class="cc-hd" onclick="toggleCutoff('${cid}')">
         <h4>${cutoff}</h4>
-        <div class="cc-meta">${rows.length} days · ${totH}h total · OT ${totOT}h · ND ${totND}h</div>
+        <div class="cc-meta">${rows.length} days · ${totH}h total · OT ${totOT}h · ND ${totND}h${flagCount>0?` · <span style="color:#E65100;font-weight:700">⚠ ${flagCount} flagged</span>`:''}</div>
         <div style="font-size:14px;color:var(--muted);margin-left:8px" id="${cid}-icon">▾</div>
       </div>
       <div class="cc-body" id="${cid}">
-        <table class="arch-tbl">
-          <thead><tr>
-            <th>Date</th><th>Day</th><th>Time In</th><th>Time Out</th>
-            <th class="num">Total</th><th class="num">Regular</th>
-            <th class="num">OT</th><th class="num">Night Diff</th>
-            <th>Punches</th><th>Flags</th>
-          </tr></thead>
-          <tbody>
-            ${rows.sort((a,b)=>String(a.work_date).localeCompare(String(b.work_date))).map(r=>{
-              const flags=[];
-              if(String(r.is_overnight)==='TRUE')flags.push('<span class="arch-badge ab-night">🌙</span>');
-              if(parseFloat(r.ot_hrs)>0)flags.push(`<span class="arch-badge ab-ot">OT</span>`);
-              if(parseFloat(r.nd_hrs)>0)flags.push(`<span class="arch-badge ab-nd">ND</span>`);
-              return `<tr>
-                <td style="font-family:'DM Mono',monospace;font-size:11px">${cleanDate(r.work_date)}</td>
-                <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${cleanTime(r.time_in)}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${cleanTime(r.time_out)}</td>
-                <td class="num">${r.total_hrs}h</td>
-                <td class="num">${r.regular_hrs}h</td>
-                <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
-                <td class="num" style="color:var(--purple)">${parseFloat(r.nd_hrs)>0?r.nd_hrs+'h':'–'}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.punch_count}</td>
-                <td>${flags.join(' ')}</td>
-              </tr>`;
-            }).join('')}
-            <tr style="background:var(--sand);font-weight:700">
-              <td colspan="4" style="font-size:12px;padding:8px 12px">CUTOFF TOTAL</td>
-              <td class="num">${totH}h</td>
-              <td class="num">${r2(rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
-              <td class="num" style="color:var(--blue)">${totOT}h</td>
-              <td class="num" style="color:var(--purple)">${totND}h</td>
-              <td colspan="2"></td>
-            </tr>
-          </tbody>
-        </table>
+        ${archBuildCutoffTable(rows, cid, empId)}
       </div>
     </div>`;
   });
 
   html+='</div>';
   document.getElementById('archive-main').innerHTML=html;
+}
+
+// ── Archive row flag logic ─────────────────────────────────────
+function archGetRowFlag(r){
+  const pc=parseInt(r.punch_count)||0;
+  const ti=cleanTime(r.time_in), to=cleanTime(r.time_out);
+  const sameTime=ti===to&&ti!=='—';
+  const totalHrs=parseFloat(r.total_hrs)||0;
+  // Single punch = likely missing pair
+  if(pc===1)return 'missing';
+  // Same in and out = zero hours, suspicious
+  if(sameTime)return 'missing';
+  // Odd number of punches: 1,3,5... means unmatched in/out
+  if(pc>1&&pc%2!==0)return 'odd';
+  // Suspicious total: >16h or 0h with >1 punch
+  if(totalHrs>16)return 'long';
+  if(totalHrs===0&&pc>1)return 'zero';
+  // Overnight but punch_count suggests no real shift
+  if(String(r.is_overnight)==='TRUE'&&pc<=1)return 'missing';
+  return 'ok';
+}
+
+// ── Archive sortable table builder ────────────────────────────
+function archBuildCutoffTable(rows, tableId, empId){
+  const sortKey=window._archSort?.[tableId]?.col||'work_date';
+  const sortDir=window._archSort?.[tableId]?.dir||'asc';
+
+  const sorted=[...rows].sort((a,b)=>{
+    if(sortKey==='flag'){
+      const fp={'missing':4,'odd':3,'long':2,'zero':2,'ok':0};
+      const fa=fp[archGetRowFlag(a)]||0, fb=fp[archGetRowFlag(b)]||0;
+      return sortDir==='asc'?fb-fa:fa-fb;
+    }
+    if(sortKey==='work_date'){
+      const sa=String(a.work_date), sb=String(b.work_date);
+      return sortDir==='asc'?sa.localeCompare(sb):sb.localeCompare(sa);
+    }
+    const numCols=['total_hrs','regular_hrs','ot_hrs','nd_hrs','punch_count'];
+    if(numCols.includes(sortKey)){
+      const va=parseFloat(a[sortKey])||0, vb=parseFloat(b[sortKey])||0;
+      return sortDir==='asc'?va-vb:vb-va;
+    }
+    const va=String(a[sortKey]||''), vb=String(b[sortKey]||'');
+    return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+  });
+
+  const th=(col,label,num=false)=>{
+    const active=sortKey===col;
+    const dir=active?sortDir:'asc';
+    const cls=`sortable${num?' num':''} ${active?'sort-'+sortDir:''}`;
+    return `<th class="${cls}" onclick="archSortTable('${tableId}','${col}','${empId}')">${label}</th>`;
+  };
+
+  const bodyRows=sorted.map(r=>{
+    const flag=archGetRowFlag(r);
+    const badges=[];
+    if(String(r.is_overnight)==='TRUE')badges.push('<span class="arch-badge ab-night">🌙</span>');
+    if(parseFloat(r.ot_hrs)>0)badges.push('<span class="arch-badge ab-ot">OT</span>');
+    if(parseFloat(r.nd_hrs)>0)badges.push('<span class="arch-badge ab-nd">ND</span>');
+    if(r._adminEdited)badges.push('<span class="arch-badge ab-edit">✎ edited</span>');
+    // Flag badges
+    if(flag==='missing')badges.push('<span class="arch-badge ab-miss">⚠ missing punch</span>');
+    else if(flag==='odd')badges.push('<span class="arch-badge ab-odd">⚠ odd punches</span>');
+    else if(flag==='long')badges.push('<span class="arch-badge ab-odd">⚠ >16h</span>');
+    else if(flag==='zero')badges.push('<span class="arch-badge ab-miss">⚠ 0h</span>');
+    const hasProblem=flag!=='ok';
+    const rowStyle=hasProblem?'background:#FFFBF0':r._adminEdited?'background:#F0FBF4':'';
+    // Store row data for admin modal
+    const rEncoded=encodeURIComponent(JSON.stringify({
+      employee_id:String(r.employee_id),
+      employee_name:String(r.employee_name),
+      work_date:cleanDate(r.work_date),
+      time_in:cleanTime(r.time_in),
+      time_out:cleanTime(r.time_out),
+      total_hrs:r.total_hrs,
+      regular_hrs:r.regular_hrs,
+      ot_hrs:r.ot_hrs,
+      nd_hrs:r.nd_hrs,
+      punch_count:r.punch_count,
+      is_overnight:r.is_overnight,
+      cutoff_label:r.cutoff_label,
+      flag
+    }));
+    return `<tr style="${rowStyle}">
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${cleanDate(r.work_date)}</td>
+      <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${cleanTime(r.time_in)}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${cleanTime(r.time_out)}</td>
+      <td class="num">${r.total_hrs}h</td>
+      <td class="num">${r.regular_hrs}h</td>
+      <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
+      <td class="num" style="color:var(--purple)">${parseFloat(r.nd_hrs)>0?r.nd_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.punch_count}${hasProblem?'<span style="color:#E65100"> ⚠</span>':''}</td>
+      <td style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px 8px">${badges.join(' ')}
+        <button class="arch-edit-btn${hasProblem?' flagged':''}" onclick="openArchiveAdminModal(decodeURIComponent('${rEncoded}'))">✎ Adjust</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="arch-tbl">
+    <thead><tr>
+      ${th('work_date','Date')} ${th('day_name','Day')}
+      ${th('time_in','Time In')} ${th('time_out','Time Out')}
+      ${th('total_hrs','Total',true)} ${th('regular_hrs','Regular',true)}
+      ${th('ot_hrs','OT',true)} ${th('nd_hrs','Night Diff',true)}
+      ${th('punch_count','Punches',true)} ${th('flag','Flags')}
+    </tr></thead>
+    <tbody>
+      ${bodyRows}
+      <tr style="background:var(--sand);font-weight:700">
+        <td colspan="4" style="font-size:12px;padding:8px 12px">CUTOFF TOTAL</td>
+        <td class="num">${r2(rows.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0))}h</td>
+        <td class="num">${r2(rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+        <td class="num" style="color:var(--blue)">${r2(rows.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0))}h</td>
+        <td class="num" style="color:var(--purple)">${r2(rows.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0))}h</td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table>`;
+}
+
+function archSortTable(tableId, col, empId){
+  if(!window._archSort)window._archSort={};
+  const cur=window._archSort[tableId]||{col:'work_date',dir:'asc'};
+  window._archSort[tableId]={
+    col,
+    dir:cur.col===col?(cur.dir==='asc'?'desc':'asc'):'asc'
+  };
+  // Re-render just this cutoff body
+  const bodyEl=document.getElementById(tableId);
+  if(!bodyEl)return;
+  // Find the rows for this cutoff from archiveData
+  const empRows=archiveData.daily.filter(r=>String(r.employee_id)===String(empId));
+  // Find the cutoff these rows belong to — decode from tableId
+  const cutoff=tableId.replace(/^cc-/,'').replace(/_/g,' ').replace(/ A$/,' | A').replace(/ B$/,' | B');
+  const cutoffRows=empRows.filter(r=>String(r.cutoff_label).replace(/[|\s]/g,'_').replace(/[^a-zA-Z0-9_-]/g,'')===tableId.replace(/^cc-/,''));
+  if(cutoffRows.length===0){
+    // fallback: re-render from archiveSelected
+    selectArchiveEmployee(empId);
+    return;
+  }
+  bodyEl.innerHTML=archBuildCutoffTable(cutoffRows,tableId,empId);
 }
 
 // ── PERIOD DETAIL ────────────────────────────────────────────────
@@ -2232,6 +2352,145 @@ function applyOvernightFix() {
   showToast('✓ Overnight shift fixed — ' + (prevRow?.work_date || workDate) + ' updated');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// ARCHIVE ADMIN ADJUSTMENT
+// ══════════════════════════════════════════════════════════════════
+let _aamRow = null; // current row being edited
+
+function openArchiveAdminModal(rowJson) {
+  try { _aamRow = typeof rowJson === 'string' ? JSON.parse(rowJson) : rowJson; }
+  catch(e) { console.error('aam parse error', e); return; }
+
+  document.getElementById('aam-subtitle').textContent =
+    _aamRow.employee_name + ' · ' + cleanDate(_aamRow.work_date);
+
+  // Flag explanation
+  const flagBanner = document.getElementById('aam-flag-banner');
+  const flagMsgs = {
+    missing: ['#FEE2E2','#991B1B','⚠ Missing punch detected','Single punch or matching in/out times suggest a biometric tap was missed. Set the correct Time In and Time Out below.'],
+    odd:     ['#FFF3E0','#92400E','⚠ Odd number of punches','An odd punch count means ins and outs don\'t pair evenly. Typically means one break punch is missing. Adjust times to reflect the actual worked hours.'],
+    long:    ['#FFF3E0','#92400E','⚠ Shift over 16 hours','This is unusually long — likely a missed out-punch that caused the next day\'s in-punch to be used as the out-punch for this shift.'],
+    zero:    ['#FEE2E2','#991B1B','⚠ Zero hours with multiple punches','Punches exist but computed hours are zero. Likely a parsing error or overnight shift not detected correctly.'],
+    ok:      null
+  };
+  const msg = flagMsgs[_aamRow.flag];
+  if (msg) {
+    flagBanner.style.display = 'block';
+    flagBanner.style.background = msg[0];
+    flagBanner.style.color = msg[1];
+    flagBanner.innerHTML = `<strong>${msg[2]}</strong><br>${msg[3]}`;
+  } else {
+    flagBanner.style.display = 'none';
+  }
+
+  // Current values
+  document.getElementById('aam-current').innerHTML = `
+    <div><div style="font-size:10px;color:var(--muted)">Time In</div><div style="font-size:16px;font-weight:700;color:var(--green)">${cleanTime(_aamRow.time_in)}</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">Time Out</div><div style="font-size:16px;font-weight:700;color:#E65100">${cleanTime(_aamRow.time_out)}</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">Total Hours</div><div style="font-size:16px;font-weight:700">${_aamRow.total_hrs}h</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">Punches</div><div style="font-size:16px;font-weight:700">${_aamRow.punch_count}</div></div>`;
+
+  // Pre-populate inputs
+  const toTimeInput = v => {
+    const t = cleanTime(v);
+    return t === '—' ? '' : t.substring(0, 5);
+  };
+  document.getElementById('aam-time-in').value  = toTimeInput(_aamRow.time_in);
+  document.getElementById('aam-time-out').value = toTimeInput(_aamRow.time_out);
+  document.getElementById('aam-punches').value  = _aamRow.punch_count || 1;
+  document.getElementById('aam-overnight').checked = String(_aamRow.is_overnight) === 'TRUE';
+  document.getElementById('aam-note').value = '';
+  document.getElementById('aam-err').textContent = '';
+
+  aamRecompute();
+  document.getElementById('arch-admin-modal').classList.add('open');
+  setTimeout(() => document.getElementById('aam-time-in').focus(), 100);
+}
+
+function closeArchiveAdminModal() {
+  document.getElementById('arch-admin-modal').classList.remove('open');
+  _aamRow = null;
+}
+
+function aamRecompute() {
+  const ti = document.getElementById('aam-time-in').value;
+  const to = document.getElementById('aam-time-out').value;
+  const overnight = document.getElementById('aam-overnight').checked;
+  if (!ti || !to) {
+    document.getElementById('aam-preview-vals').innerHTML =
+      '<div style="color:var(--muted);font-size:12px;grid-column:span 4">Set Time In and Time Out to see computed result</div>';
+    return;
+  }
+  const inM = t2m(ti), outM = t2m(to);
+  const isOvernight = overnight || (outM < inM && inM > 18*60);
+  const rawMins = isOvernight ? (1440 - inM + outM) : (outM - inM);
+  const adjMins = rawMins >= 240 ? rawMins - 60 : rawMins;
+  const totalHrs = r2(Math.max(adjMins / 60, 0));
+  const regHrs   = r2(Math.min(totalHrs, 8));
+  const otHrs    = r2(Math.max(totalHrs - 8, 0));
+  const ndHrs    = r2(calcND(inM, outM, isOvernight));
+
+  document.getElementById('aam-preview-vals').innerHTML = `
+    <div><div style="font-size:10px;color:var(--blue)">Total</div><div style="font-size:16px;font-weight:700">${totalHrs}h</div></div>
+    <div><div style="font-size:10px;color:var(--blue)">Regular</div><div style="font-size:16px;font-weight:700;color:var(--green)">${regHrs}h</div></div>
+    <div><div style="font-size:10px;color:var(--blue)">OT</div><div style="font-size:16px;font-weight:700;color:var(--blue)">${otHrs}h</div></div>
+    <div><div style="font-size:10px;color:var(--blue)">Night Diff</div><div style="font-size:16px;font-weight:700;color:var(--purple)">${ndHrs}h</div></div>
+    ${isOvernight?'<div style="grid-column:span 4;font-size:11px;color:var(--purple);margin-top:2px">🌙 Overnight shift detected</div>':''}`;
+}
+
+function applyArchiveAdminEdit() {
+  const note = document.getElementById('aam-note').value.trim();
+  if (!note) { document.getElementById('aam-err').textContent = 'Reason is required'; return; }
+  const ti = document.getElementById('aam-time-in').value;
+  const to = document.getElementById('aam-time-out').value;
+  if (!ti || !to) { document.getElementById('aam-err').textContent = 'Set both Time In and Time Out'; return; }
+
+  const overnight = document.getElementById('aam-overnight').checked;
+  const pc = parseInt(document.getElementById('aam-punches').value) || _aamRow.punch_count;
+  const inM = t2m(ti), outM = t2m(to);
+  const isOvernight = overnight || (outM < inM && inM > 18*60);
+  const rawMins = isOvernight ? (1440 - inM + outM) : (outM - inM);
+  const adjMins = rawMins >= 240 ? rawMins - 60 : rawMins;
+  const totalHrs = r2(Math.max(adjMins / 60, 0));
+  const regHrs   = r2(Math.min(totalHrs, 8));
+  const otHrs    = r2(Math.max(totalHrs - 8, 0));
+  const ndHrs    = r2(calcND(inM, outM, isOvernight));
+
+  // Find and update the row in archiveData
+  const empId = String(_aamRow.employee_id);
+  const workDate = String(_aamRow.work_date);
+  const rowIdx = archiveData.daily.findIndex(r =>
+    String(r.employee_id) === empId && cleanDate(r.work_date) === workDate
+  );
+
+  if (rowIdx >= 0) {
+    archiveData.daily[rowIdx] = {
+      ...archiveData.daily[rowIdx],
+      time_in:     ti,
+      time_out:    to,
+      total_hrs:   totalHrs,
+      regular_hrs: regHrs,
+      ot_hrs:      otHrs,
+      nd_hrs:      ndHrs,
+      is_overnight: isOvernight ? 'TRUE' : 'FALSE',
+      punch_count: pc,
+      _adminEdited: true,
+      _adminNote:  note,
+      _adminDate:  new Date().toISOString().slice(0,10)
+    };
+  }
+
+  closeArchiveAdminModal();
+
+  // Re-render the employee view to show changes
+  selectArchiveEmployee(empId);
+  showToast('✓ Adjustment saved — ' + workDate + ' updated (' + totalHrs + 'h)');
+
+  // Note: changes are in-memory only. Remind user to write back to Sheets.
+  // In the future this can POST to Apps Script to persist.
+  setTimeout(() => showToast('⚠ Changes are in-memory — export to Sheets to persist'), 3500);
+}
+
 console.log("PH Payroll v4 loaded — single panel-1 ✓");
 function openSettings(){}
 function closeSettings(){}
@@ -2341,6 +2600,69 @@ function resetAll(){
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeOvernightModal()">Cancel</button>
       <button class="btn btn-confirm" id="ont-apply-btn" onclick="applyOvernightFix()" style="padding:9px 24px">✓ Apply Fix</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ ARCHIVE ADMIN ADJUST MODAL ═══ -->
+<div class="modal-overlay" id="arch-admin-modal" onclick="if(event.target===this)closeArchiveAdminModal()">
+  <div class="arch-admin-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy)">✎ Administrative Adjustment</h3>
+      <button class="btn btn-ghost" onclick="closeArchiveAdminModal()" style="padding:6px 12px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" id="aam-subtitle"></p>
+
+    <!-- Flag explanation -->
+    <div id="aam-flag-banner" style="display:none;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;line-height:1.6"></div>
+
+    <!-- Current computed values -->
+    <div style="background:var(--cream);border:1px solid var(--rule);border-radius:8px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Current Stored Values</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="aam-current"></div>
+    </div>
+
+    <!-- Adjustment inputs -->
+    <div style="font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px">Set Corrected Values</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time In</div>
+        <input type="time" id="aam-time-in" style="width:100%;min-height:38px;font-size:14px;font-weight:600;color:var(--green)" oninput="aamRecompute()">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time Out</div>
+        <input type="time" id="aam-time-out" style="width:100%;min-height:38px;font-size:14px;font-weight:600;color:#E65100" oninput="aamRecompute()">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Punch Count</div>
+        <input type="number" id="aam-punches" min="0" max="20" style="width:100%;min-height:38px;font-size:14px" oninput="aamRecompute()">
+      </div>
+      <div style="display:flex;align-items:flex-end;padding-bottom:4px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="aam-overnight" onchange="aamRecompute()" style="width:16px;height:16px">
+          Overnight shift
+        </label>
+      </div>
+    </div>
+
+    <!-- Live recompute preview -->
+    <div style="background:var(--lt-blue);border:1px solid #90CAF9;border-radius:8px;padding:12px 16px;margin-bottom:16px" id="aam-preview">
+      <div style="font-size:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1.5px;color:var(--blue);margin-bottom:8px">Computed Result</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px" id="aam-preview-vals"></div>
+    </div>
+
+    <!-- Admin note -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Reason / Note <span style="color:var(--muted);font-weight:400">(required)</span></div>
+      <textarea id="aam-note" rows="2" placeholder="e.g. Missed out punch — confirmed with employee. Shift was 08:00–17:30."
+        style="width:100%;padding:8px 12px;border:1px solid var(--rule);border-radius:6px;font-family:-apple-system,sans-serif;font-size:13px;resize:vertical;min-height:60px"></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;align-items:center">
+      <span id="aam-err" style="font-size:12px;color:var(--red)"></span>
+      <button class="btn btn-ghost" onclick="closeArchiveAdminModal()">Cancel</button>
+      <button class="btn btn-confirm" onclick="applyArchiveAdminEdit()" style="padding:9px 24px">✓ Save Adjustment</button>
     </div>
   </div>
 </div>
