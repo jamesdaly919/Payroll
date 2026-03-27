@@ -401,16 +401,15 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 
 <!-- ═══ PANEL 1: UPLOAD ═══ -->
 <div class="panel active" id="panel-1">
-  <!-- Hero with two paths -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;margin-top:24px">
-    <!-- Path A: Upload new -->
-    <div style="background:white;border:2px solid var(--blue);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer" onclick="document.getElementById('upload-section').style.display='block';document.getElementById('main-choice').style.display='none'">
+
+  <!-- Two-path home screen -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0 28px">
+    <div style="background:white;border:2px solid var(--blue);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer" onclick="showUploadSection()">
       <div style="font-size:40px;margin-bottom:12px">📊</div>
       <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--navy);margin-bottom:6px">Process New Cutoff</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.6">Upload a biometrics export, review attendance, fix mispunches, and save to Google Sheets</div>
       <div style="margin-top:16px;background:var(--blue);color:white;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;display:inline-block">Upload Biometrics →</div>
     </div>
-    <!-- Path B: View archive -->
     <div style="background:white;border:2px solid var(--rule);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer" onclick="openArchive()">
       <div style="font-size:40px;margin-bottom:12px">📂</div>
       <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--navy);margin-bottom:6px">View Payroll Archive</div>
@@ -419,32 +418,31 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
     </div>
   </div>
 
-  <!-- Upload section (hidden until chosen) -->
-  <div id="main-choice" style="display:none"><!-- spacer --></div>
+  <!-- Upload section — shown after clicking Process New Cutoff -->
   <div id="upload-section" style="display:none">
-  <div class="cutoff-bar">
-    <div class="cutoff-opt selected" id="co-a" onclick="selCutoff('A')">
-      <div class="co-dot">📅</div>
-      <div><h4>Cutoff A — 8th to 22nd</h4><p>Mid-month payroll period</p></div>
+    <div class="cutoff-bar">
+      <div class="cutoff-opt selected" id="co-a" onclick="selCutoff('A')">
+        <div class="co-dot">📅</div>
+        <div><h4>Cutoff A — 8th to 22nd</h4><p>Mid-month payroll period</p></div>
+      </div>
+      <div class="cutoff-opt" id="co-b" onclick="selCutoff('B')">
+        <div class="co-dot">📅</div>
+        <div><h4>Cutoff B — 23rd to 7th</h4><p>End-of-month · spans two calendar months</p></div>
+      </div>
     </div>
-    <div class="cutoff-opt" id="co-b" onclick="selCutoff('B')">
-      <div class="co-dot">📅</div>
-      <div><h4>Cutoff B — 23rd to 7th</h4><p>End-of-month · spans two calendar months</p></div>
+    <div class="drop-zone" id="drop-zone"
+      onclick="document.getElementById('fi').click()"
+      ondragover="dDragOver(event)" ondragleave="dDragLeave(event)" ondrop="dDrop(event)">
+      <span class="drop-icon">📊</span>
+      <h3>Drop your biometrics XLSX here</h3>
+      <p>Standard "View Attendance Punch" export · Columns: Person ID · Person Name · Punch Date · Attendance record</p>
+      <button class="btn-upload" onclick="event.stopPropagation();document.getElementById('fi').click()">Browse File</button>
+      <input type="file" id="fi" accept=".xlsx,.xls" onchange="handleFile(event)">
     </div>
+    <div id="up-err"></div>
   </div>
-  <div class="drop-zone" id="drop-zone"
-    onclick="document.getElementById('fi').click()"
-    ondragover="dDragOver(event)" ondragleave="dDragLeave(event)" ondrop="dDrop(event)">
-    <span class="drop-icon">📊</span>
-    <h3>Drop your biometrics XLSX here</h3>
-    <p>Standard "View Attendance Punch" export · Columns: Person ID · Person Name · Punch Date · Attendance record</p>
-    <button class="btn-upload" onclick="event.stopPropagation();document.getElementById('fi').click()">Browse File</button>
-    <input type="file" id="fi" accept=".xlsx,.xls" onchange="handleFile(event)">
-  </div>
-  <div id="up-err"></div>
-</div>
 
-  </div><!-- /upload-section -->
+</div><!-- /panel-1 -->
 
 <!-- ═══ PANEL 2: PREVIEW ═══ -->
 <div class="panel" id="panel-2">
@@ -1396,23 +1394,92 @@ function closeArchive(){document.getElementById('archive-overlay').classList.rem
 
 async function refreshArchive(){
   const statusEl=document.getElementById('arch-conn-status');
-  statusEl.textContent='Loading…';
+  const listEl=document.getElementById('archive-list');
+  statusEl.textContent='Loading from Sheets…';
+  listEl.innerHTML='<div class="archive-loading">Connecting to Google Sheets…</div>';
+
+  // If we have locally parsed data from this session, offer it immediately
+  if(allSummaryRows.length>0&&!archiveLoaded){
+    archiveData.daily=allSummaryRows.map(r=>({
+      employee_id:r.employee_id, employee_name:r.employee_name,
+      work_date:r.work_date, time_in:r.time_in, time_out:r.time_out,
+      total_hrs:r.total_hrs, regular_hrs:r.regular_hrs,
+      ot_hrs:r.ot_hrs, nd_hrs:r.nd_hrs,
+      is_overnight:r.is_overnight?'TRUE':'FALSE',
+      punch_count:r.punch_count, cutoff_label:r.cutoff_label
+    }));
+    archiveData.monthly=[];
+    archiveData.weekly=[];
+    Object.values(employeeMap).forEach(emp=>{
+      Object.entries(emp.monthly).forEach(([ym,M])=>{
+        archiveData.monthly.push({employee_id:emp.id,employee_name:emp.name,year_month:ym,
+          w1_hrs:M.w1.h,w1_reg:M.w1.r,w1_ot:M.w1.o,w1_nd:M.w1.n,w1_days:M.w1.d,
+          w2_hrs:M.w2.h,w2_reg:M.w2.r,w2_ot:M.w2.o,w2_nd:M.w2.n,w2_days:M.w2.d,
+          w3_hrs:M.w3.h,w3_reg:M.w3.r,w3_ot:M.w3.o,w3_nd:M.w3.n,w3_days:M.w3.d,
+          w4_hrs:M.w4.h,w4_reg:M.w4.r,w4_ot:M.w4.o,w4_nd:M.w4.n,w4_days:M.w4.d,
+          total_hrs:M.total.h,total_ot_hrs:M.total.o,total_nd_hrs:M.total.n,
+          days_worked:M.total.d,cutoff_label:allSummaryRows[0]?.cutoff_label||''
+        });
+      });
+    });
+  }
+
   try{
     const resp=await fetch(GAS_URL+'?action=read_all&t='+Date.now());
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
-    if(data.status!=='ok')throw new Error(data.error);
-    archiveData={
+
+    // Old Apps Script deployment won't have read_all — detect and guide user
+    if(data.status!=='ok'){
+      throw new Error(data.error||'Apps Script returned an error');
+    }
+
+    // Check if it's the old script (no daily_summary key)
+    if(!data.hasOwnProperty('daily_summary')){
+      throw new Error('Apps Script needs to be updated — paste the new AppsScript_Code.gs and redeploy');
+    }
+
+    const fromSheets={
       daily:data.daily_summary||[],
       monthly:data.employee_monthly||[],
       weekly:data.employee_weekly||[]
     };
+
+    // Merge: prefer Sheets data, supplement with local session data
+    if(fromSheets.daily.length>0){
+      archiveData=fromSheets;
+    }
+    // else keep local data
+
     archiveLoaded=true;
-    statusEl.textContent=archiveData.daily.length+' day records loaded';
+    const src=fromSheets.daily.length>0?'Google Sheets':'current session (not yet saved)';
+    statusEl.textContent=archiveData.daily.length+' records from '+src;
     renderArchiveSidebar();
+
   }catch(err){
-    statusEl.textContent='Error: '+err.message;
-    document.getElementById('archive-list').innerHTML='<div class="archive-loading" style="color:var(--red)">Failed to load: '+err.message+'</div>';
+    console.error('Archive load error:',err);
+    if(archiveData.daily.length>0){
+      // Show local data with warning
+      archiveLoaded=true;
+      statusEl.textContent='⚠ Sheets unavailable — showing current session only';
+      listEl.innerHTML='';
+      document.getElementById('archive-main').innerHTML=`
+        <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:#5D4037">
+          <strong>⚠ Could not load from Google Sheets:</strong> ${err.message}<br><br>
+          Showing data from this session only. To fix:<br>
+          1. Paste the latest <strong>AppsScript_Code.gs</strong> into your Apps Script editor<br>
+          2. Create a <strong>new deployment</strong> (not update existing)<br>
+          3. Click 🔄 Refresh
+        </div>`;
+      renderArchiveSidebar();
+    }else{
+      statusEl.textContent='✗ Failed to load';
+      listEl.innerHTML=`<div class="archive-loading" style="color:var(--red);text-align:left;padding:16px">
+        <strong>Could not connect to Google Sheets</strong><br><br>
+        ${err.message}<br><br>
+        <strong>Fix:</strong> Paste the new AppsScript_Code.gs into your Apps Script, create a new deployment, and click 🔄 Refresh.
+      </div>`;
+    }
   }
 }
 
@@ -1915,6 +1982,10 @@ function showToast(msg) {
   t.textContent = msg;
   t.style.opacity = '1';
   setTimeout(() => t.style.opacity = '0', 3000);
+}
+
+function showUploadSection(){
+  document.getElementById('upload-section').style.display='block';
 }
 
 function openSettings(){}
