@@ -462,6 +462,34 @@ table.roster-tbl tbody td.peso-total{
 .ps-cell.grand .psv{color:var(--green);font-size:24px}
 @media(max-width:900px){.payroll-summary-bar{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.payroll-summary-bar{grid-template-columns:1fr 1fr}}
+
+/* ── NAME PUNCH DROPDOWN ── */
+.name-cell-wrap{display:flex;align-items:center;gap:0;position:relative}
+.name-drop-btn{display:flex;align-items:center;gap:6px;cursor:pointer;background:none;border:none;font-family:inherit;text-align:left;padding:0}
+.name-drop-btn .nd-name{font-size:13px;font-weight:600;color:var(--navy);line-height:1.3}
+.name-drop-btn .nd-arrow{font-size:9px;color:var(--muted);margin-left:2px;transition:transform .2s;flex-shrink:0}
+.name-drop-btn.open .nd-arrow{transform:rotate(180deg);color:var(--blue)}
+.name-drop-btn:hover .nd-name{color:var(--blue)}
+
+/* The dropdown panel */
+.punch-dropdown{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:50;
+  background:white;border:1px solid var(--rule);border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.13);min-width:280px;max-width:340px;overflow:hidden}
+.punch-dropdown.open{display:block}
+.pd-header{padding:9px 12px;background:var(--navy);display:flex;align-items:center;justify-content:space-between}
+.pd-header .pd-hname{font-size:12px;font-weight:700;color:white;font-family:'Syne',sans-serif}
+.pd-header .pd-hdate{font-size:10px;color:rgba(255,255,255,.6);font-family:'DM Mono',monospace}
+.pd-punch-list{padding:8px 0}
+.pd-punch-row{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid #F5F0E8;transition:background .1s}
+.pd-punch-row:last-child{border-bottom:none}
+.pd-punch-row:hover{background:#FAFBFF}
+.pd-time{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;min-width:48px}
+.pd-time.in{color:var(--green)}.pd-time.out{color:#E65100}.pd-time.mid{color:var(--text2)}.pd-time.night{color:var(--purple)}
+.pd-role{font-size:10px;font-weight:600;border-radius:4px;padding:2px 7px;font-family:'DM Mono',monospace}
+.pd-role.in{background:#E8F5EE;color:var(--green)}.pd-role.out{background:#FFF3E0;color:#E65100}
+.pd-role.mid{background:var(--sand);color:var(--muted)}.pd-role.night{background:#EDE7F6;color:var(--purple)}
+.pd-foot{padding:8px 12px;border-top:1px solid var(--rule);display:flex;gap:6px;background:var(--sand)}
+.pd-total{font-size:11px;color:var(--muted);flex:1;font-family:'DM Mono',monospace}
 </style>
 </head>
 <body>
@@ -573,6 +601,13 @@ table.roster-tbl tbody td.peso-total{
   </div>
   <div class="stat-row" id="stat-row"></div>
   <div id="alerts-zone"></div>
+  <div style="background:var(--lt-blue);border:1px solid #90CAF9;border-left:3px solid var(--blue);border-radius:0 6px 6px 0;padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2);line-height:1.7">
+    <strong style="color:var(--blue)">How this table works:</strong>
+    Each row = one worked day per employee. Multiple biometric taps on the same day are <em>grouped into one row</em> 
+    — first tap is Time In, last tap is Time Out, middle taps are breaks. 
+    Click the <strong>N taps</strong> badge in the Punches column to see every individual tap for that day.
+    Use <strong>✎ Edit</strong> if any tap needs correcting.
+  </div>
   <div class="filter-bar">
     <input type="text" id="search" placeholder="Search name or ID…" oninput="filterTable()">
     <select id="filt-ot" onchange="filterTable()">
@@ -583,7 +618,7 @@ table.roster-tbl tbody td.peso-total{
       <option value="tail">🌙 Overnight Tail</option>
       <option value="warn">Needs Review</option>
     </select>
-    <label><input type="checkbox" id="show-punches" onchange="renderTable(activeRows)"> Show all punches</label>
+    <label style="font-size:11px;color:var(--muted)"><input type="checkbox" id="show-punches" onchange="renderTable(activeRows)"> Expand all punch taps inline</label>
   </div>
   <div class="table-wrap">
     <table class="pt">
@@ -1048,14 +1083,75 @@ function renderTable(rows){
     const punchDetail=showPunches?`<tr class="punch-detail-row"><td colspan="11"><div class="punch-detail-inner">
       ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
     </div></td></tr>`:'';
-    return`<tr data-idx="${i}" style="cursor:pointer" onclick="togglePunchRow(${i})">
-      <td class="td-id">${row.employee_id}</td><td class="td-name">${row.employee_name}</td>
+    return`<tr data-idx="${i}">
+      <td class="td-id">${row.employee_id}</td>
+      <td class="td-name" style="position:relative" onclick="event.stopPropagation()">
+        <div class="name-cell-wrap">
+          <button class="name-drop-btn${row.all_punches.length>1?' multi':''}" id="ndb-${row.employee_id}-${row.work_date.replace(/\//g,'-')}"
+            onclick="toggleNameDrop('${row.employee_id}','${row.work_date}',this)"
+            title="${row.all_punches.length} punch tap${row.all_punches.length!==1?'s':''} — click to expand">
+            <div>
+              <div class="nd-name">${row.employee_name}</div>
+              <div style="font-size:10px;color:var(--muted);font-family:'DM Mono',monospace">${row.all_punches.length} tap${row.all_punches.length!==1?'s':''}</div>
+            </div>
+            <span class="nd-arrow">▾</span>
+          </button>
+          <div class="punch-dropdown" id="pd-drop-${row.employee_id}-${row.work_date.replace(/\//g,'-')}">
+            <div class="pd-header">
+              <span class="pd-hname">${row.employee_name}</span>
+              <span class="pd-hdate">${row.work_date}</span>
+            </div>
+            <div class="pd-punch-list">
+              ${(()=>{
+                const punches=row.all_punches;
+                return punches.map((t,pi)=>{
+                  const isFirst=pi===0, isLast=pi===punches.length-1;
+                  const isNight=t2m(t)>=22*60||t2m(t)<6*60;
+                  let role='mid', roleLabel='break';
+                  if(isFirst){role='in';roleLabel='TIME IN';}
+                  else if(isLast&&punches.length>1){role='out';roleLabel='TIME OUT';}
+                  else if(isNight){role='night';roleLabel='night tap';}
+                  return `<div class="pd-punch-row">
+                    <div class="pd-time ${role}">${t}</div>
+                    <div class="pd-role ${role}">${roleLabel}</div>
+                    ${isFirst&&punches.length===1?'<div style="font-size:10px;color:#E65100;margin-left:auto">⚠ single tap</div>':''}
+                    ${isNight&&!isFirst&&!isLast?'<div style="font-size:10px;color:var(--purple);margin-left:auto">🌙</div>':''}
+                  </div>`;
+                }).join('');
+              })()}
+            </div>
+            <div class="pd-foot">
+              <div class="pd-total">${row.total_hrs}h · ${t24(row.time_in)} → ${t24(row.time_out)}</div>
+              <button onclick="event.stopPropagation();closeAllNameDrops();openPunchModal('${row.employee_id}','${row.work_date}')"
+                style="font-size:10px;background:var(--blue);color:white;border:none;border-radius:5px;padding:3px 10px;cursor:pointer">✎ Edit</button>
+              ${row.is_overnight_tail?`<button onclick="event.stopPropagation();closeAllNameDrops();openOvernightTailModal('${row.employee_id}','${row.work_date}')"
+                style="font-size:10px;background:#E65100;color:white;border:none;border-radius:5px;padding:3px 10px;cursor:pointer">🌙 Fix Tail</button>`:''}
+            </div>
+          </div>
+        </div>
+      </td>
       <td class="td-date">${row.work_date}</td>
       <td class="td-time in">${t24(row.time_in)}</td><td class="td-time out">${t24(row.time_out)}</td>
       <td class="td-hrs">${row.total_hrs}h</td><td class="td-hrs">${row.regular_hrs}h</td>
       <td class="td-hrs ot">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
       <td class="td-hrs nd">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}${row.punch_count===1?' ⚠':''}</td>
+      <td>
+        <button onclick="event.stopPropagation();togglePunchExpand('${row.employee_id}','${row.work_date}')"
+          style="background:none;border:1px solid var(--rule);border-radius:12px;padding:2px 9px;font-size:11px;font-family:'DM Mono',monospace;cursor:pointer;color:${row.punch_count===1?'#E65100':row.punch_count>=4?'var(--blue)':'var(--muted)'};"
+          title="Click to see all ${row.punch_count} tap${row.punch_count!==1?'s':''}">
+          ${row.punch_count} tap${row.punch_count!==1?'s':''}${row.punch_count===1?' ⚠':''}
+        </button>
+        <div id="pe-${row.employee_id}-${row.work_date.replace(/\//g,'-')}" style="display:none;margin-top:4px;font-size:10px">
+          ${row.all_punches.map((t,pi)=>{
+            let cls='';
+            if(pi===0)cls='first';
+            else if(pi===row.all_punches.length-1)cls='last';
+            else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';
+            const lbl=pi===0?'⏵':pi===row.all_punches.length-1?'⏹':`·`;
+            return `<span class="punch-chip ${cls}" style="font-size:10px;padding:2px 6px">${lbl} ${t}</span>`;
+          }).join(' ')}
+        </div>
+      </td>
       <td>${flags.join(' ')}</td><td><button class='btn btn-ghost' style='font-size:10px;padding:3px 8px;min-height:26px' onclick="event.stopPropagation();openPunchModal('${row.employee_id}','${row.work_date}')">✎ Edit</button></td></tr>${punchDetail}`;
   }).join('');
 }
@@ -2271,6 +2367,37 @@ function cleanTime(val){
   return '—';
 }
 // 24-hr time formatter alias for preview table
+// ── Name punch dropdown ────────────────────────────────────────
+function toggleNameDrop(empId, workDate, btn) {
+  const key = empId + '-' + workDate.replace(/\//g, '-');
+  const drop = document.getElementById('pd-drop-' + key);
+  if (!drop) return;
+  const isOpen = drop.classList.contains('open');
+  // Close all others first
+  closeAllNameDrops();
+  if (!isOpen) {
+    drop.classList.add('open');
+    btn.classList.add('open');
+    // Close when clicking outside
+    setTimeout(() => {
+      document.addEventListener('click', closeAllNameDrops, { once: true });
+    }, 10);
+  }
+}
+
+function closeAllNameDrops() {
+  document.querySelectorAll('.punch-dropdown.open').forEach(d => d.classList.remove('open'));
+  document.querySelectorAll('.name-drop-btn.open').forEach(b => b.classList.remove('open'));
+}
+
+function togglePunchExpand(empId, workDate) {
+  const id = 'pe-' + empId + '-' + workDate.replace(/\//g, '-');
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  if (el) el.style.flexWrap = 'wrap';
+  if (el) el.style.gap = '3px';
+}
+
 function t24(v){return cleanTime(v);}
 function getDayName(dateStr){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
