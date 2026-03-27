@@ -253,9 +253,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="logo">PH<span>Payroll</span></div>
-  <div class="topbar-right">
-    <button class="btn-sm" onclick="openSettings()">⚙ Settings</button>
-  </div>
+  <div class="topbar-right"></div>
 </div>
 
 <!-- STEPS -->
@@ -263,7 +261,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
   <div class="step-tab active" id="tab-1" onclick="goTo(1)"><div class="step-num">1</div>Upload</div>
   <div class="step-tab" id="tab-2" onclick="goTo(2)"><div class="step-num">2</div>Preview</div>
   <div class="step-tab" id="tab-3" onclick="goTo(3)"><div class="step-num">3</div>Analytics</div>
-  <div class="step-tab" id="tab-4" onclick="goTo(4)"><div class="step-num">4</div>Confirm</div>
+  <div class="step-tab" id="tab-4" onclick="goTo(4)"><div class="step-num">4</div>Save to Sheets</div>
   <div class="step-tab" id="tab-5"><div class="step-num">5</div>Done</div>
 </div>
 
@@ -451,29 +449,36 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- ═══ PANEL 4: CONFIRM ═══ -->
+<!-- ═══ PANEL 4: EXPORT ═══ -->
 <div class="panel" id="panel-4">
-  <div class="confirm-box">
-    <h2>Write to Google Sheets</h2>
-    <p>This will append all parsed attendance and analytics data to your Sheets backend. No existing rows are overwritten.</p>
+  <div class="confirm-box" style="max-width:780px">
+    <h2>Save to Google Sheets</h2>
+    <p>This writes all parsed data directly into your Google Sheets backend — permanently. Each cutoff you process adds new rows without overwriting existing ones.</p>
+
     <div class="confirm-grid" id="confirm-grid"></div>
-    <div class="sheets-write-list">
+
+    <div class="sheets-write-list" style="text-align:left">
       <div class="sw-item"><span class="sw-tab">03_RawPunches</span><span class="sw-desc">Every individual biometric tap</span></div>
       <div class="sw-item"><span class="sw-tab">04_DailySummary</span><span class="sw-desc">Computed daily hours per employee</span></div>
       <div class="sw-item"><span class="sw-tab">05_EmployeeMonthly</span><span class="sw-desc">Monthly totals with week-by-week breakdown</span></div>
-      <div class="sw-item"><span class="sw-tab">06_EmployeeWeekly</span><span class="sw-desc">One row per employee per week per month</span></div>
+      <div class="sw-item"><span class="sw-tab">06_EmployeeWeekly</span><span class="sw-desc">One row per employee per week</span></div>
     </div>
-    <div id="no-url-warn" class="alert alert-warn" style="display:none;text-align:left">
-      ⚠️ <span>No Apps Script URL set. <a href="#" onclick="openSettings();return false">Open Settings</a> to configure.</span>
+
+    <div id="conn-status" class="alert alert-info" style="text-align:left;display:none">
+      <span id="conn-msg"></span>
     </div>
+
     <div class="progress-bar" id="prog-bar"><div class="progress-fill" id="prog-fill"></div></div>
     <div class="status-msg" id="status-msg"></div>
-    <div style="display:flex;gap:12px;justify-content:center;margin-top:12px">
+
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
       <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
-      <button class="btn btn-confirm" id="confirm-btn" onclick="writeToSheets()">✓ Write to Google Sheets</button>
+      <button class="btn btn-ghost" id="test-btn" onclick="testConn()" style="font-size:12px">🔌 Test Connection</button>
+      <button class="btn btn-confirm" id="confirm-btn" onclick="writeToSheets()">✓ Save to Google Sheets</button>
     </div>
-    <p style="margin-top:16px;font-size:11px;color:var(--muted)">
-      Endpoint: <code id="url-display" style="font-family:'DM Mono',monospace;font-size:10px">not configured</code>
+
+    <p style="margin-top:14px;font-size:11px;color:var(--muted)">
+      Writing directly to Google Sheets via Apps Script
     </p>
   </div>
 </div>
@@ -482,34 +487,31 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 <div class="panel" id="panel-5">
   <div class="done-box">
     <div class="di">✅</div>
-    <h2>All Written!</h2>
-    <p id="done-msg">Attendance, analytics, and weekly breakdowns saved to Google Sheets.</p>
+    <h2>Saved to Sheets!</h2>
+    <p id="done-msg">All data written to your Google Sheets backend.</p>
+    <div style="background:var(--sand);border-radius:12px;padding:20px 24px;margin-bottom:24px;text-align:left;max-width:480px;margin-left:auto;margin-right:auto">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px">Your data is now live in Google Sheets</div>
+      <div style="font-size:13px;color:var(--text);line-height:2">
+        Every cutoff you process accumulates in the same sheet.<br>
+        Open <strong>05_EmployeeMonthly</strong> or <strong>06_EmployeeWeekly</strong> to see trends build up over time.
+      </div>
+    </div>
     <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="resetAll()">Upload Another Cutoff</button>
-      <a id="open-link" href="#" target="_blank" class="btn btn-ghost">Open Google Sheets ↗</a>
+      <button class="btn btn-primary" onclick="resetAll()">Process Another Cutoff</button>
+      <a id="open-sheets-link" href="#" target="_blank" class="btn btn-ghost" style="display:none">Open Google Sheets ↗</a>
     </div>
   </div>
 </div>
 
 </div><!-- /main -->
 
-<!-- SETTINGS MODAL -->
-<div class="modal-overlay" id="settings-modal">
-  <div class="modal">
-    <h3>Settings</h3>
-    <p class="sub">Paste your Apps Script Web App URL to enable writing to Google Sheets.</p>
-    <div class="fg"><label>Apps Script Web App URL</label>
-      <input type="text" id="url-input" placeholder="https://script.google.com/macros/s/…/exec"></div>
-    <div class="fg"><label>Google Sheets URL (for "Open Sheets" link)</label>
-      <input type="text" id="link-input" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
-    </div>
-  </div>
-</div>
 
 <script>
+// ══════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS BACKEND — hardcoded URL, same pattern as Operations Hub
+// ══════════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw1JtzdlQ4eDN7jq8wE8pocqcOWafKmA_Q8shJF1mx6M-GV1HGbF0XNznYEsoMdR85ECw/exec';
+
 // ══════════════════════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════════════════════
@@ -517,8 +519,6 @@ let rawPunches=[], summaryRows=[], allSummaryRows=[], activeRows=[];
 let employeeMap={};
 let currentStep=1, selectedCutoff='A', sourceFile='';
 let sortState={col:'work_date',dir:'asc'};
-let sheetsUrl=localStorage.getItem('sheetsUrl')||'';
-let sheetsLink=localStorage.getItem('sheetsLink')||'';
 let gridView='grid';
 
 // ══════════════════════════════════════════════════════════════════
@@ -1109,117 +1109,143 @@ function drawCalendar(emp,year,month){
 }
 
 // ══════════════════════════════════════════════════════════════════
-// CONFIRM & WRITE TO SHEETS
+// CONFIRM RENDER
 // ══════════════════════════════════════════════════════════════════
-function renderConfirm(){
-  const emps=Object.keys(employeeMap).length;
-  const warnCt=allSummaryRows.filter(r=>r.needs_review).length;
-  document.getElementById('confirm-grid').innerHTML=`
+function renderConfirm() {
+  const cutoff = allSummaryRows[0]?.cutoff_label || '';
+  const emps = Object.keys(employeeMap).length;
+  const monthlyRows = Object.values(employeeMap).reduce((s,e) => s + Object.keys(e.monthly).length, 0);
+  const weeklyRows  = Object.values(employeeMap).reduce((s,e) => s + e.weekly.length, 0);
+  document.getElementById('confirm-grid').innerHTML = `
     <div class="cg-item"><div class="cg-label">Day Records</div><div class="cg-value">${allSummaryRows.length}</div></div>
     <div class="cg-item"><div class="cg-label">Employees</div><div class="cg-value">${emps}</div></div>
     <div class="cg-item"><div class="cg-label">OT Records</div><div class="cg-value">${allSummaryRows.filter(r=>r.ot_hrs>0).length}</div></div>
     <div class="cg-item"><div class="cg-label">Raw Punches</div><div class="cg-value">${rawPunches.length}</div></div>
-    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${Object.values(employeeMap).reduce((s,e)=>s+Object.keys(e.monthly).length,0)}</div></div>
-    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${Object.values(employeeMap).reduce((s,e)=>s+e.weekly.length,0)}</div></div>`;
-  document.getElementById('url-display').textContent=sheetsUrl||'not configured';
-  document.getElementById('no-url-warn').style.display=sheetsUrl?'none':'flex';
-  document.getElementById('confirm-btn').disabled=!sheetsUrl;
+    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${monthlyRows}</div></div>
+    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${weeklyRows}</div></div>`;
 }
 
-async function writeToSheets(){
-  if(!sheetsUrl){openSettings();return}
-  const btn=document.getElementById('confirm-btn');
-  const bar=document.getElementById('prog-bar');
-  const fill=document.getElementById('prog-fill');
-  const msg=document.getElementById('status-msg');
-  btn.disabled=true;btn.textContent='Writing…';bar.classList.add('active');
-  const now=new Date().toISOString();
-
-  const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
-  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now]);
-
-  // Monthly analytics rows
-  const monthlyRows=[];
-  Object.values(employeeMap).forEach(emp=>{
-    Object.entries(emp.monthly).forEach(([ym,M])=>{
-      monthlyRows.push([
-        emp.id,emp.name,ym,
-        M.w1.h,M.w1.r,M.w1.o,M.w1.n,M.w1.d,
-        M.w2.h,M.w2.r,M.w2.o,M.w2.n,M.w2.d,
-        M.w3.h,M.w3.r,M.w3.o,M.w3.n,M.w3.d,
-        M.w4.h,M.w4.r,M.w4.o,M.w4.n,M.w4.d,
-        M.total.h,M.total.r,M.total.o,M.total.n,
-        M.total.d,emp.avgDailyHrs,emp.otRatePct,emp.ndRatePct,
-        emp.maxDailyHrs,emp.minDailyHrs,emp.overnightDays,emp.totalPunches,
-        allSummaryRows[0]?.cutoff_label||'',now
-      ]);
-    });
+// ══════════════════════════════════════════════════════════════════
+// API — direct to Apps Script, same pattern as Operations Hub
+// ══════════════════════════════════════════════════════════════════
+async function apiPost(sheet, rows) {
+  const resp = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ sheet_name: sheet, rows }),
   });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  if (data.status !== 'ok') throw new Error(data.error || 'Unknown error');
+  return data;
+}
 
-  // Weekly rows
-  const weeklyRows=[];
-  Object.values(employeeMap).forEach(emp=>{
-    emp.weekly.forEach(w=>{
-      weeklyRows.push([emp.id,emp.name,w.yearMonth,w.weekNum,w.weekLabel,
-        w.hrs,w.regHrs,w.otHrs,w.ndHrs,w.days,w.avgDailyHrs,
-        w.dateFrom,w.dateTo,w.cutoffLabel,now]);
-    });
-  });
-
-  const steps=[
-    ['03_RawPunches',rawRows,20,'Writing raw punches…'],
-    ['04_DailySummary',dailyRows,50,'Writing daily summary…'],
-    ['05_EmployeeMonthly',monthlyRows,75,'Writing monthly analytics…'],
-    ['06_EmployeeWeekly',weeklyRows,100,'Writing weekly analytics…'],
-  ];
-
-  try{
-    for(const[sheet,rows,pct,label] of steps){
-      msg.textContent=label;fill.style.width=`${pct/4}%`;
-      await post(sheet,rows);
-      fill.style.width=`${pct}%`;
+async function testConn() {
+  const btn = document.getElementById('test-btn');
+  const connEl = document.getElementById('conn-status');
+  const msgEl  = document.getElementById('conn-msg');
+  btn.disabled = true; btn.textContent = 'Testing…';
+  connEl.style.display = 'flex';
+  connEl.className = 'alert alert-info';
+  msgEl.textContent = 'Pinging Apps Script…';
+  try {
+    const resp = await fetch(GAS_URL + '?t=' + Date.now());
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      connEl.className = 'alert alert-info';
+      const missing = data.sheets_missing?.length > 0 ? ` ⚠ Missing sheets: ${data.sheets_missing.join(', ')}` : '';
+      msgEl.innerHTML = `✓ Connected to <strong>${data.spreadsheet || 'Google Sheets'}</strong>.${missing}`;
+    } else {
+      connEl.className = 'alert alert-warn';
+      msgEl.textContent = '✗ ' + (data.error || 'Unexpected response');
     }
-    msg.textContent=`✓ All done! ${rawRows.length} punches · ${dailyRows.length} daily · ${monthlyRows.length} monthly · ${weeklyRows.length} weekly rows written.`;
-    msg.className='status-msg ok';
-    setTimeout(()=>{
-      document.getElementById('done-msg').textContent=`${dailyRows.length} daily records, ${monthlyRows.length} monthly analytics, and ${weeklyRows.length} weekly breakdowns saved to Google Sheets.`;
-      const lnk=document.getElementById('open-link');
-      lnk.href=sheetsLink||'#';lnk.style.display=sheetsLink?'':'none';
-      goTo(5);
-    },1400);
-  }catch(err){
-    fill.style.width='0%';msg.textContent=`Error: ${err.message}`;msg.className='status-msg err';
-    btn.disabled=false;btn.textContent='✓ Write to Google Sheets';
+  } catch(err) {
+    connEl.className = 'alert alert-warn';
+    msgEl.textContent = '✗ ' + err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '🔌 Test Connection';
   }
 }
 
-async function post(sheet,rows){
-  const r=await fetch(sheetsUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet_name:sheet,rows})});
-  if(!r.ok)throw new Error(`HTTP ${r.status}`);
-  const d=await r.json();
-  if(d.status!=='ok')throw new Error(d.error||'Unknown error');
-  return d;
+// ══════════════════════════════════════════════════════════════════
+// WRITE TO GOOGLE SHEETS
+// ══════════════════════════════════════════════════════════════════
+async function writeToSheets() {
+  const btn  = document.getElementById('confirm-btn');
+  const bar  = document.getElementById('prog-bar');
+  const fill = document.getElementById('prog-fill');
+  const msg  = document.getElementById('status-msg');
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+  bar.classList.add('active');
+  const now = new Date().toISOString();
+  const cutoff = allSummaryRows[0]?.cutoff_label || '';
+
+  const rawRows = rawPunches.map(r => [
+    r.employee_id, r.employee_name, r.punch_date, r.punch_time,
+    getCutoffLabel(r.punch_date), sourceFile, now
+  ]);
+  const dailyRows = allSummaryRows.map(r => [
+    r.employee_id, r.employee_name, r.work_date, r.time_in, r.time_out,
+    r.total_hrs, r.regular_hrs, r.ot_hrs, r.nd_hrs,
+    r.is_overnight ? 'TRUE' : 'FALSE', r.punch_count,
+    r.cutoff_label, r.source_file, now
+  ]);
+  const mrows = [];
+  Object.values(employeeMap).forEach(emp => {
+    Object.entries(emp.monthly).forEach(([ym, M]) => {
+      mrows.push([emp.id, emp.name, ym,
+        M.w1.h, M.w1.r, M.w1.o, M.w1.n, M.w1.d,
+        M.w2.h, M.w2.r, M.w2.o, M.w2.n, M.w2.d,
+        M.w3.h, M.w3.r, M.w3.o, M.w3.n, M.w3.d,
+        M.w4.h, M.w4.r, M.w4.o, M.w4.n, M.w4.d,
+        M.total.h, M.total.r, M.total.o, M.total.n,
+        M.total.d, emp.avgDailyHrs, emp.otRatePct, emp.ndRatePct,
+        emp.maxDailyHrs, emp.minDailyHrs, emp.overnightDays, emp.totalPunches, cutoff, now]);
+    });
+  });
+  const wrows = [];
+  Object.values(employeeMap).forEach(emp => {
+    emp.weekly.forEach(w => {
+      wrows.push([emp.id, emp.name, w.yearMonth, w.weekNum, w.weekLabel,
+        w.hrs, w.regHrs, w.otHrs, w.ndHrs, w.days, w.avgDailyHrs,
+        w.dateFrom, w.dateTo, w.cutoffLabel, now]);
+    });
+  });
+
+  const steps = [
+    ['03_RawPunches',      rawRows,   20, 'Writing raw punches…'],
+    ['04_DailySummary',    dailyRows, 50, 'Writing daily summary…'],
+    ['05_EmployeeMonthly', mrows,     75, 'Writing monthly analytics…'],
+    ['06_EmployeeWeekly',  wrows,    100, 'Writing weekly breakdowns…'],
+  ];
+
+  try {
+    for (const [sheet, rows, pct, label] of steps) {
+      msg.textContent = label; fill.style.width = (pct / 4) + '%';
+      await apiPost(sheet, rows);
+      fill.style.width = pct + '%';
+    }
+    msg.textContent = `✓ Done! ${rawRows.length} punches · ${dailyRows.length} daily · ${mrows.length} monthly · ${wrows.length} weekly rows saved.`;
+    msg.className = 'status-msg ok';
+    document.getElementById('done-msg').textContent =
+      `${dailyRows.length} daily records, ${mrows.length} monthly and ${wrows.length} weekly analytics written to Google Sheets for cutoff ${cutoff}.`;
+    setTimeout(() => goTo(5), 1200);
+  } catch(err) {
+    fill.style.width = '0%';
+    msg.textContent = 'Error: ' + err.message;
+    msg.className = 'status-msg err';
+    btn.disabled = false; btn.textContent = '✓ Save to Google Sheets';
+  }
 }
 
-// ══════════════════════════════════════════════════════════════════
-// SETTINGS
-// ══════════════════════════════════════════════════════════════════
-function openSettings(){
-  document.getElementById('url-input').value=sheetsUrl;
-  document.getElementById('link-input').value=sheetsLink;
-  document.getElementById('settings-modal').classList.add('open');
-}
-function closeSettings(){document.getElementById('settings-modal').classList.remove('open')}
-function saveSettings(){
-  sheetsUrl=document.getElementById('url-input').value.trim();
-  sheetsLink=document.getElementById('link-input').value.trim();
-  localStorage.setItem('sheetsUrl',sheetsUrl);localStorage.setItem('sheetsLink',sheetsLink);
-  closeSettings();
-}
-document.getElementById('settings-modal').addEventListener('click',e=>{if(e.target===document.getElementById('settings-modal'))closeSettings()});
-function resetAll(){
-  rawPunches=[];summaryRows=[];allSummaryRows=[];activeRows=[];employeeMap={};sourceFile='';
-  document.getElementById('fi').value='';document.getElementById('up-err').innerHTML='';
+function openSettings() {}
+function closeSettings() {}
+function saveSettings() {}
+
+function resetAll() {
+  rawPunches=[]; summaryRows=[]; allSummaryRows=[]; activeRows=[]; employeeMap={}; sourceFile='';
+  document.getElementById('fi').value='';
+  document.getElementById('up-err').innerHTML='';
   goTo(1);
 }
 </script>
