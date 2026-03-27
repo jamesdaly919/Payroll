@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PH Payroll Tool</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:#0D1B2A; --ink:#1A2E42; --blue:#1565C0; --sky:#4A90D9;
+  --gold:#F5A623; --green:#1A7A4A; --red:#C0392B; --purple:#6A1B9A;
+  --teal:#004D40; --indigo:#1A237E; --cream:#FDFAF5; --sand:#F0EAD6;
+  --rule:#E0D8C8; --muted:#6B7C93; --white:#FFFFFF; --text:#1A2E42;
+  --lt-blue:#EEF4FE; --lt-green:#E8F5EE; --lt-yellow:#FFFDE7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--text);min-height:100vh}
+
+/* ── TOPBAR ── */
+.topbar{background:var(--navy);padding:0 28px;height:54px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--white);letter-spacing:-.5px}
+.logo span{color:var(--gold)}
+.topbar-right{display:flex;gap:10px;align-items:center}
+.btn-sm{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.7);border-radius:6px;padding:5px 13px;font-size:12px;cursor:pointer;font-family:'DM Mono',monospace;transition:all .2s}
+.btn-sm:hover{background:rgba(255,255,255,.15);color:white}
+
+/* ── STEPS ── */
+.steps-bar{background:white;border-bottom:1px solid var(--rule);padding:0 28px;display:flex;gap:0;overflow-x:auto}
+.step-tab{padding:13px 22px;display:flex;align-items:center;gap:9px;cursor:pointer;border-bottom:3px solid transparent;transition:all .2s;font-size:13px;color:var(--muted);white-space:nowrap}
+.step-tab.active{color:var(--blue);border-bottom-color:var(--blue);font-weight:500}
+.step-tab.done{color:var(--green)}
+.step-num{width:20px;height:20px;background:var(--muted);border-radius:50%;color:white;font-family:'DM Mono',monospace;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-tab.active .step-num{background:var(--blue)}
+.step-tab.done .step-num{background:var(--green)}
+
+/* ── LAYOUT ── */
+.main{max-width:1280px;margin:0 auto;padding:28px 28px}
+.panel{display:none}.panel.active{display:block}
+
+/* ── UPLOAD ── */
+.upload-hero{text-align:center;padding:40px 0 24px}
+.upload-hero h2{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.upload-hero p{font-size:14px;color:var(--muted);max-width:460px;margin:0 auto}
+.cutoff-bar{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.cutoff-opt{background:white;border:2px solid var(--rule);border-radius:12px;padding:18px 22px;cursor:pointer;transition:all .2s;display:flex;gap:14px;align-items:center}
+.cutoff-opt:hover{border-color:var(--sky)}.cutoff-opt.selected{border-color:var(--blue);background:var(--lt-blue)}
+.cutoff-opt .co-dot{width:38px;height:38px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.cutoff-opt h4{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--navy);margin-bottom:2px}
+.cutoff-opt p{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace}
+.drop-zone{border:2px dashed var(--rule);border-radius:14px;padding:56px 40px;text-align:center;cursor:pointer;transition:all .25s;background:white;margin-bottom:20px}
+.drop-zone:hover,.drop-zone.dragging{border-color:var(--blue);background:var(--lt-blue)}
+.drop-icon{font-size:44px;margin-bottom:14px;display:block}
+.drop-zone h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.drop-zone p{font-size:13px;color:var(--muted);margin-bottom:14px}
+.drop-zone input[type=file]{display:none}
+.btn-upload{background:var(--blue);color:white;border:none;border-radius:8px;padding:9px 22px;font-size:13px;font-weight:500;cursor:pointer;transition:background .2s}
+.btn-upload:hover{background:#1251a3}
+
+/* ── STATS ROW ── */
+.stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px}
+.stat-card{background:white;border:1px solid var(--rule);border-radius:10px;padding:14px 16px}
+.sc-label{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.sc-value{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--navy)}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.stat-card.ok .sc-value{color:var(--green)}.stat-card.warn .sc-value{color:var(--gold)}
+
+/* ── FILTER BAR ── */
+.filter-bar{display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+.filter-bar input,.filter-bar select{border:1px solid var(--rule);border-radius:7px;padding:7px 11px;font-size:13px;font-family:'DM Sans',sans-serif;background:white;color:var(--text);outline:none;transition:border .2s}
+.filter-bar input:focus,.filter-bar select:focus{border-color:var(--sky)}
+.filter-bar input{min-width:200px}
+.filter-bar label{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;display:flex;align-items:center;gap:6px;cursor:pointer}
+
+/* ── TABLE ── */
+.table-wrap{background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:20px}
+table.pt{width:100%;border-collapse:collapse;font-size:12.5px}
+table.pt thead tr{background:var(--navy)}
+table.pt thead th{color:rgba(255,255,255,.65);text-align:left;padding:10px 13px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,.05);cursor:pointer;user-select:none}
+table.pt thead th:hover{color:white}
+table.pt tbody tr{border-bottom:1px solid #F5F0E8;transition:background .1s}
+table.pt tbody tr:hover{background:#FAFBFF}
+table.pt tbody td{padding:9px 13px;vertical-align:middle}
+.td-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--blue);font-weight:500}
+.td-name{font-weight:500}
+.td-date{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)}
+.td-time{font-family:'DM Mono',monospace;font-size:11.5px}
+.td-time.in{color:var(--green)}.td-time.out{color:#E65100}
+.td-hrs{font-family:'DM Mono',monospace;font-size:12px;font-weight:500}
+.td-hrs.ot{color:var(--blue)}.td-hrs.nd{color:var(--purple)}
+.badge{display:inline-flex;align-items:center;gap:3px;border-radius:4px;padding:2px 6px;font-family:'DM Mono',monospace;font-size:10px;font-weight:500}
+.b-ot{background:#E8F5EE;color:var(--green)}.b-nd{background:#EDE7F6;color:var(--purple)}
+.b-night{background:#E3F2FD;color:var(--blue)}.b-warn{background:#FFF3E0;color:#E65100}
+.punch-detail-row td{padding:0!important;background:#F8F9FF}
+.punch-detail-inner{padding:8px 36px;display:flex;gap:6px;flex-wrap:wrap}
+.punch-chip{background:white;border:1px solid var(--rule);border-radius:20px;padding:3px 9px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text)}
+.punch-chip.first{border-color:var(--green);color:var(--green)}.punch-chip.last{border-color:#E65100;color:#E65100}.punch-chip.night{border-color:var(--purple);color:var(--purple)}
+
+/* ── BUTTONS ── */
+.btn{border:none;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--navy);color:white}.btn-primary:hover{background:var(--ink)}
+.btn-confirm{background:var(--green);color:white;font-size:14px;padding:10px 26px}.btn-confirm:hover{background:#145f3a}
+.btn-confirm:disabled{background:#9E9E9E;cursor:not-allowed}
+.btn-ghost{background:white;color:var(--muted);border:1px solid var(--rule)}.btn-ghost:hover{background:var(--sand);color:var(--text)}
+.btn-blue{background:var(--blue);color:white}.btn-blue:hover{background:#1251a3}
+
+/* ── ALERTS ── */
+.alert{border-radius:8px;padding:11px 15px;font-size:13px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start}
+.alert-warn{background:#FFF8E1;border:1px solid #FFE082;color:#5D4037}
+.alert-info{background:var(--lt-blue);border:1px solid #90CAF9;color:var(--indigo)}
+
+/* ══════════════════════════════════════════════════════
+   ANALYTICS PANEL
+══════════════════════════════════════════════════════ */
+.analytics-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.analytics-header h2{font-family:'Syne',sans-serif;font-size:26px;font-weight:800;color:var(--navy)}
+.analytics-header p{font-size:13px;color:var(--muted);margin-top:3px}
+.analytics-actions{display:flex;gap:10px;flex-shrink:0}
+
+/* Employee Grid */
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:24px}
+.emp-card{background:white;border:1px solid var(--rule);border-radius:12px;padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.emp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(to right,var(--blue),var(--sky));transform:scaleX(0);transform-origin:left;transition:transform .25s}
+.emp-card:hover{border-color:var(--sky);box-shadow:0 4px 20px rgba(21,101,192,.1);transform:translateY(-2px)}
+.emp-card:hover::before{transform:scaleX(1)}
+.ec-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.ec-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--blue));color:white;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:700;font-size:14px;flex-shrink:0}
+.ec-name{font-weight:600;font-size:14px;color:var(--navy);line-height:1.3}
+.ec-id{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px}
+.ec-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;padding:12px;background:var(--cream);border-radius:8px}
+.ec-stat .ec-val{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--navy);display:block}
+.ec-stat .ec-lbl{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:.5px;display:block;margin-top:1px}
+.ec-badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px;min-height:22px}
+.ec-week-bars{display:flex;gap:4px;align-items:flex-end;height:36px;padding-top:4px}
+.ec-week-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.ec-week-bar{width:100%;border-radius:2px 2px 0 0;min-height:2px;transition:height .3s}
+.ec-week-label{font-size:8.5px;color:var(--muted);font-family:'DM Mono',monospace}
+
+/* Sort/search bar for analytics */
+.analytics-controls{display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+.analytics-controls input,.analytics-controls select{border:1px solid var(--rule);border-radius:7px;padding:7px 11px;font-size:13px;font-family:'DM Sans',sans-serif;background:white;color:var(--text);outline:none;transition:border .2s}
+.analytics-controls input:focus,.analytics-controls select:focus{border-color:var(--sky)}
+.analytics-controls input{min-width:200px}
+.agg-toggle{display:flex;background:white;border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.agg-opt{padding:7px 14px;font-size:12px;cursor:pointer;transition:all .2s;font-family:'DM Mono',monospace;color:var(--muted)}
+.agg-opt.active{background:var(--navy);color:white}
+
+/* ── EMPLOYEE DETAIL VIEW ── */
+#emp-detail{display:none;animation:slideIn .25s ease-out}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.detail-header{display:flex;align-items:flex-start;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+.detail-back{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--blue);font-weight:500;margin-bottom:16px;transition:all .2s}
+.detail-back:hover{gap:10px}
+.detail-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--blue));color:white;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:20px;flex-shrink:0}
+.detail-name{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy);line-height:1.2}
+.detail-meta{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-top:4px;display:flex;gap:14px}
+.detail-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px}
+.kpi-card{background:white;border:1px solid var(--rule);border-radius:10px;padding:16px 14px;text-align:center}
+.kpi-card .kv{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--navy)}
+.kpi-card .kl{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;margin-top:3px}
+.kpi-blue .kv{color:var(--blue)}.kpi-green .kv{color:var(--green)}
+.kpi-purple .kv{color:var(--purple)}.kpi-gold .kv{color:var(--gold)}
+
+/* Chart and breakdown layout */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:900px){.detail-grid{grid-template-columns:1fr}}
+.detail-card{background:white;border:1px solid var(--rule);border-radius:12px;padding:22px;overflow:hidden}
+.detail-card h3{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:16px}
+.detail-card-full{background:white;border:1px solid var(--rule);border-radius:12px;padding:22px;margin-bottom:16px;overflow:hidden}
+.detail-card-full h3{font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:16px}
+
+/* Monthly breakdown table */
+table.breakdown{width:100%;border-collapse:collapse;font-size:12.5px}
+table.breakdown thead th{text-align:center;padding:8px 10px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--rule)}
+table.breakdown thead th:first-child{text-align:left}
+table.breakdown tbody td{padding:8px 10px;border-bottom:1px solid #F5F0E8;text-align:center;font-family:'DM Mono',monospace;font-size:12px}
+table.breakdown tbody td:first-child{text-align:left;font-weight:500;color:var(--navy)}
+table.breakdown tfoot td{padding:9px 10px;text-align:center;font-family:'DM Mono',monospace;font-size:12px;font-weight:700;background:var(--sand);border-top:2px solid var(--rule)}
+table.breakdown tfoot td:first-child{text-align:left;color:var(--navy)}
+.w1-col{background:#F3F4FF;color:var(--indigo)}.w2-col{background:#EEF4FE;color:var(--blue)}
+.w3-col{background:var(--lt-green);color:var(--green)}.w4-col{background:#FFF3E0;color:#BF360C}
+table.breakdown tbody tr:last-child td{border-bottom:none}
+
+/* Calendar heatmap */
+.cal-legend{display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.cal-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
+.cal-swatch{width:12px;height:12px;border-radius:2px}
+.cal-month-label{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--navy);margin-bottom:10px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:16px}
+.cal-day-header{text-align:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);padding:3px 0}
+.cal-cell{border-radius:4px;aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;cursor:default;transition:transform .1s}
+.cal-cell:hover{transform:scale(1.1);z-index:10}
+.cal-cell.empty{background:transparent}
+.cal-cell .cn{font-family:'DM Mono',monospace;font-size:9px;font-weight:600;line-height:1}
+.cal-cell .ch{font-family:'DM Mono',monospace;font-size:8px;opacity:.85;line-height:1;margin-top:1px}
+
+/* Daily detail table */
+table.daily-detail{width:100%;border-collapse:collapse;font-size:12px}
+table.daily-detail thead th{text-align:left;padding:9px 12px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--rule);background:var(--sand)}
+table.daily-detail tbody td{padding:8px 12px;border-bottom:1px solid #F5F0E8;vertical-align:middle}
+table.daily-detail tbody tr:hover{background:#FAFBFF}
+table.daily-detail tbody tr:last-child td{border-bottom:none}
+.hrs-bar-wrap{display:flex;align-items:center;gap:7px}
+.hrs-bar{height:8px;border-radius:4px;background:linear-gradient(to right,var(--green),var(--blue));min-width:2px}
+.hrs-bar.ot-bar{background:var(--blue)}
+.hrs-bar.nd-bar{background:var(--purple)}
+
+/* ── CONFIRM ── */
+.confirm-box{background:white;border:1px solid var(--rule);border-radius:16px;padding:36px;text-align:center;max-width:680px;margin:40px auto}
+.confirm-box h2{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.confirm-box p{font-size:13px;color:var(--muted);margin-bottom:22px}
+.confirm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px;text-align:left}
+.cg-item{background:var(--sand);border-radius:8px;padding:12px 14px}
+.cg-label{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:4px}
+.cg-value{font-family:'Syne',sans-serif;font-size:19px;font-weight:700;color:var(--navy)}
+.progress-bar{height:5px;background:var(--rule);border-radius:3px;overflow:hidden;margin:14px 0;display:none}
+.progress-bar.active{display:block}
+.progress-fill{height:100%;background:var(--green);width:0%;border-radius:3px;transition:width .3s}
+.status-msg{font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-top:6px;min-height:18px}
+.status-msg.ok{color:var(--green)}.status-msg.err{color:var(--red)}
+.sheets-write-list{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;text-align:left}
+.sw-item{background:var(--lt-blue);border-radius:7px;padding:9px 14px;display:flex;align-items:center;gap:10px;font-size:12.5px}
+.sw-item .sw-tab{font-family:'DM Mono',monospace;font-size:11px;color:var(--blue);font-weight:500;min-width:160px}
+.sw-item .sw-desc{color:var(--muted)}
+
+/* ── DONE ── */
+.done-box{text-align:center;padding:70px 40px;max-width:540px;margin:0 auto}
+.done-box .di{font-size:58px;margin-bottom:20px}
+.done-box h2{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy);margin-bottom:8px}
+.done-box p{font-size:14px;color:var(--muted);margin-bottom:24px}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:16px;padding:28px;width:100%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.modal h3{font-family:'Syne',sans-serif;font-size:19px;font-weight:800;margin-bottom:4px;color:var(--navy)}
+.modal p.sub{font-size:13px;color:var(--muted);margin-bottom:20px}
+.fg{margin-bottom:14px}
+.fg label{display:block;font-size:11px;font-weight:500;color:var(--muted);margin-bottom:5px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px}
+.fg input{width:100%;border:1px solid var(--rule);border-radius:7px;padding:9px 12px;font-size:13px;font-family:'DM Mono',monospace;color:var(--text);outline:none;transition:border .2s}
+.fg input:focus{border-color:var(--blue)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1000px){.detail-kpi-row{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.stat-row{grid-template-columns:repeat(3,1fr)}.emp-grid{grid-template-columns:1fr 1fr}.detail-kpi-row{grid-template-columns:1fr 1fr 1fr}.confirm-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:500px){.main{padding:16px}.stat-row{grid-template-columns:1fr 1fr}.emp-grid{grid-template-columns:1fr}.cutoff-bar{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">PH<span>Payroll</span></div>
+  <div class="topbar-right">
+    <button class="btn-sm" onclick="openSettings()">⚙ Settings</button>
+  </div>
+</div>
+
+<!-- STEPS -->
+<div class="steps-bar">
+  <div class="step-tab active" id="tab-1" onclick="goTo(1)"><div class="step-num">1</div>Upload</div>
+  <div class="step-tab" id="tab-2" onclick="goTo(2)"><div class="step-num">2</div>Preview</div>
+  <div class="step-tab" id="tab-3" onclick="goTo(3)"><div class="step-num">3</div>Analytics</div>
+  <div class="step-tab" id="tab-4" onclick="goTo(4)"><div class="step-num">4</div>Confirm</div>
+  <div class="step-tab" id="tab-5"><div class="step-num">5</div>Done</div>
+</div>
+
+<div class="main">
+
+<!-- ═══ PANEL 1: UPLOAD ═══ -->
+<div class="panel active" id="panel-1">
+  <div class="upload-hero">
+    <h2>Upload Biometrics File</h2>
+    <p>The tool will parse every punch, summarize attendance, and build per-employee analytics.</p>
+  </div>
+  <div class="cutoff-bar">
+    <div class="cutoff-opt selected" id="co-a" onclick="selCutoff('A')">
+      <div class="co-dot">📅</div>
+      <div><h4>Cutoff A — 8th to 22nd</h4><p>Mid-month payroll period</p></div>
+    </div>
+    <div class="cutoff-opt" id="co-b" onclick="selCutoff('B')">
+      <div class="co-dot">📅</div>
+      <div><h4>Cutoff B — 23rd to 7th</h4><p>End-of-month · spans two calendar months</p></div>
+    </div>
+  </div>
+  <div class="drop-zone" id="drop-zone"
+    onclick="document.getElementById('fi').click()"
+    ondragover="dDragOver(event)" ondragleave="dDragLeave(event)" ondrop="dDrop(event)">
+    <span class="drop-icon">📊</span>
+    <h3>Drop your biometrics XLSX here</h3>
+    <p>Standard "View Attendance Punch" export · Columns: Person ID · Person Name · Punch Date · Attendance record</p>
+    <button class="btn-upload" onclick="event.stopPropagation();document.getElementById('fi').click()">Browse File</button>
+    <input type="file" id="fi" accept=".xlsx,.xls" onchange="handleFile(event)">
+  </div>
+  <div id="up-err"></div>
+</div>
+
+<!-- ═══ PANEL 2: PREVIEW ═══ -->
+<div class="panel" id="panel-2">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:16px;flex-wrap:wrap">
+    <div>
+      <h2 style="font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--navy)">Parsed Attendance</h2>
+      <p id="prev-sub" style="font-size:13px;color:var(--muted);margin-top:3px"></p>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-ghost" onclick="goTo(1)">← Re-upload</button>
+      <button class="btn btn-blue" onclick="goTo(3)">View Analytics →</button>
+    </div>
+  </div>
+  <div class="stat-row" id="stat-row"></div>
+  <div id="alerts-zone"></div>
+  <div class="filter-bar">
+    <input type="text" id="search" placeholder="Search name or ID…" oninput="filterTable()">
+    <select id="filt-ot" onchange="filterTable()">
+      <option value="">All rows</option>
+      <option value="ot">Has Overtime</option>
+      <option value="nd">Has Night Diff</option>
+      <option value="overnight">Overnight</option>
+      <option value="warn">Needs Review</option>
+    </select>
+    <label><input type="checkbox" id="show-punches" onchange="renderTable(activeRows)"> Show all punches</label>
+  </div>
+  <div class="table-wrap">
+    <table class="pt">
+      <thead><tr>
+        <th onclick="sortTbl('employee_id')">Emp ID</th>
+        <th onclick="sortTbl('employee_name')">Name</th>
+        <th onclick="sortTbl('work_date')">Date</th>
+        <th onclick="sortTbl('time_in')">Time In</th>
+        <th onclick="sortTbl('time_out')">Time Out</th>
+        <th onclick="sortTbl('total_hrs')">Total</th>
+        <th onclick="sortTbl('regular_hrs')">Reg</th>
+        <th onclick="sortTbl('ot_hrs')">OT</th>
+        <th onclick="sortTbl('nd_hrs')">ND</th>
+        <th>Punches</th>
+        <th>Flags</th>
+      </tr></thead>
+      <tbody id="prev-tbody"></tbody>
+    </table>
+  </div>
+  <div style="text-align:right;margin-bottom:24px">
+    <button class="btn btn-blue" onclick="goTo(3)" style="font-size:14px;padding:10px 26px">View Analytics →</button>
+  </div>
+</div>
+
+<!-- ═══ PANEL 3: ANALYTICS ═══ -->
+<div class="panel" id="panel-3">
+
+  <!-- GRID VIEW -->
+  <div id="emp-grid-view">
+    <div class="analytics-header">
+      <div>
+        <h2>Employee Analytics</h2>
+        <p id="analytics-sub">Click any employee to see detailed breakdown</p>
+      </div>
+      <div class="analytics-actions">
+        <button class="btn btn-ghost" onclick="goTo(2)">← Preview</button>
+        <button class="btn btn-blue" onclick="goTo(4)">Confirm & Write →</button>
+      </div>
+    </div>
+    <div class="analytics-controls">
+      <input type="text" id="emp-search" placeholder="Search employee…" oninput="filterGrid()">
+      <select id="sort-by" onchange="filterGrid()">
+        <option value="name">Sort: Name</option>
+        <option value="total_hrs">Sort: Total Hours</option>
+        <option value="ot_hrs">Sort: OT Hours</option>
+        <option value="nd_hrs">Sort: ND Hours</option>
+        <option value="days">Sort: Days Worked</option>
+      </select>
+      <div class="agg-toggle">
+        <div class="agg-opt active" id="view-grid" onclick="setView('grid')">Grid</div>
+        <div class="agg-opt" id="view-list" onclick="setView('list')">List</div>
+      </div>
+    </div>
+    <div id="emp-grid" class="emp-grid"></div>
+    <!-- List view table (hidden by default) -->
+    <div id="emp-list-view" style="display:none">
+      <div class="table-wrap">
+        <table class="pt" id="emp-list-table">
+          <thead><tr>
+            <th>Emp ID</th><th>Name</th><th>Days</th>
+            <th>Total Hrs</th><th>Reg Hrs</th><th>OT Hrs</th><th>ND Hrs</th>
+            <th>Avg/Day</th><th>OT Days</th><th>Overnight</th><th>W1</th><th>W2</th><th>W3</th><th>W4</th>
+          </tr></thead>
+          <tbody id="emp-list-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="text-align:right;margin-top:8px">
+      <button class="btn btn-blue" onclick="goTo(4)" style="font-size:14px;padding:10px 26px">Confirm & Write to Sheets →</button>
+    </div>
+  </div>
+
+  <!-- DETAIL VIEW (hidden until click) -->
+  <div id="emp-detail">
+    <div class="detail-back" onclick="closeDetail()">← Back to All Employees</div>
+    <div class="detail-header">
+      <div class="detail-avatar" id="d-avatar"></div>
+      <div>
+        <div class="detail-name" id="d-name"></div>
+        <div class="detail-meta" id="d-meta"></div>
+      </div>
+    </div>
+    <div class="detail-kpi-row" id="d-kpi"></div>
+    <div class="detail-grid">
+      <div class="detail-card">
+        <h3>Monthly / Weekly Breakdown</h3>
+        <div id="d-breakdown"></div>
+      </div>
+      <div class="detail-card">
+        <h3>Weekly Hours Chart</h3>
+        <div id="d-chart"></div>
+        <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"><span style="width:12px;height:8px;border-radius:2px;background:var(--green);display:inline-block"></span>Regular</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"><span style="width:12px;height:8px;border-radius:2px;background:var(--blue);display:inline-block"></span>Overtime</span>
+          <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace"><span style="width:12px;height:8px;border-radius:2px;background:var(--purple);display:inline-block"></span>Night Diff</span>
+        </div>
+      </div>
+    </div>
+    <div class="detail-card-full">
+      <h3>Attendance Calendar</h3>
+      <div class="cal-legend">
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:#E0E0E0"></span>Absent</span>
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:#81C784"></span>&lt;8h</span>
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:var(--green)"></span>8h</span>
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:var(--blue)"></span>OT</span>
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:var(--purple)"></span>Night Diff</span>
+        <span class="cal-legend-item"><span class="cal-swatch" style="background:#E65100"></span>Overnight</span>
+      </div>
+      <div id="d-calendar"></div>
+    </div>
+    <div class="detail-card-full">
+      <h3>Daily Breakdown</h3>
+      <div style="overflow-x:auto">
+        <table class="daily-detail">
+          <thead><tr>
+            <th>Date</th><th>Day</th><th>Time In</th><th>Time Out</th>
+            <th>Total Hrs</th><th>Reg Hrs</th><th>OT Hrs</th><th>ND Hrs</th>
+            <th>Punches</th><th>Week</th><th>Flags</th>
+          </tr></thead>
+          <tbody id="d-daily-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-ghost" onclick="closeDetail()">← All Employees</button>
+      <button class="btn btn-blue" onclick="goTo(4)">Confirm & Write to Sheets →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 4: CONFIRM ═══ -->
+<div class="panel" id="panel-4">
+  <div class="confirm-box">
+    <h2>Write to Google Sheets</h2>
+    <p>This will append all parsed attendance and analytics data to your Sheets backend. No existing rows are overwritten.</p>
+    <div class="confirm-grid" id="confirm-grid"></div>
+    <div class="sheets-write-list">
+      <div class="sw-item"><span class="sw-tab">03_RawPunches</span><span class="sw-desc">Every individual biometric tap</span></div>
+      <div class="sw-item"><span class="sw-tab">04_DailySummary</span><span class="sw-desc">Computed daily hours per employee</span></div>
+      <div class="sw-item"><span class="sw-tab">05_EmployeeMonthly</span><span class="sw-desc">Monthly totals with week-by-week breakdown</span></div>
+      <div class="sw-item"><span class="sw-tab">06_EmployeeWeekly</span><span class="sw-desc">One row per employee per week per month</span></div>
+    </div>
+    <div id="no-url-warn" class="alert alert-warn" style="display:none;text-align:left">
+      ⚠️ <span>No Apps Script URL set. <a href="#" onclick="openSettings();return false">Open Settings</a> to configure.</span>
+    </div>
+    <div class="progress-bar" id="prog-bar"><div class="progress-fill" id="prog-fill"></div></div>
+    <div class="status-msg" id="status-msg"></div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:12px">
+      <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+      <button class="btn btn-confirm" id="confirm-btn" onclick="writeToSheets()">✓ Write to Google Sheets</button>
+    </div>
+    <p style="margin-top:16px;font-size:11px;color:var(--muted)">
+      Endpoint: <code id="url-display" style="font-family:'DM Mono',monospace;font-size:10px">not configured</code>
+    </p>
+  </div>
+</div>
+
+<!-- ═══ PANEL 5: DONE ═══ -->
+<div class="panel" id="panel-5">
+  <div class="done-box">
+    <div class="di">✅</div>
+    <h2>All Written!</h2>
+    <p id="done-msg">Attendance, analytics, and weekly breakdowns saved to Google Sheets.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="resetAll()">Upload Another Cutoff</button>
+      <a id="open-link" href="#" target="_blank" class="btn btn-ghost">Open Google Sheets ↗</a>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <h3>Settings</h3>
+    <p class="sub">Paste your Apps Script Web App URL to enable writing to Google Sheets.</p>
+    <div class="fg"><label>Apps Script Web App URL</label>
+      <input type="text" id="url-input" placeholder="https://script.google.com/macros/s/…/exec"></div>
+    <div class="fg"><label>Google Sheets URL (for "Open Sheets" link)</label>
+      <input type="text" id="link-input" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+let rawPunches=[], summaryRows=[], allSummaryRows=[], activeRows=[];
+let employeeMap={};
+let currentStep=1, selectedCutoff='A', sourceFile='';
+let sortState={col:'work_date',dir:'asc'};
+let sheetsUrl=localStorage.getItem('sheetsUrl')||'';
+let sheetsLink=localStorage.getItem('sheetsLink')||'';
+let gridView='grid';
+
+// ══════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════════
+function goTo(n){
+  if(n>1&&summaryRows.length===0)return;
+  currentStep=n;
+  document.querySelectorAll('.panel').forEach((p,i)=>p.classList.toggle('active',i+1===n));
+  document.querySelectorAll('.step-tab').forEach((t,i)=>{
+    t.classList.remove('active','done');
+    if(i+1<n)t.classList.add('done');
+    if(i+1===n)t.classList.add('active');
+  });
+  if(n===3&&Object.keys(employeeMap).length===0)buildAnalytics();
+  if(n===3){renderGrid();closeDetail()}
+  if(n===4)renderConfirm();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CUTOFF
+// ══════════════════════════════════════════════════════════════════
+function selCutoff(c){
+  selectedCutoff=c;
+  document.getElementById('co-a').classList.toggle('selected',c==='A');
+  document.getElementById('co-b').classList.toggle('selected',c==='B');
+}
+function getCutoffLabel(dateStr){
+  const p=dateStr.split('/');
+  const day=parseInt(p[1]),ym=p[2]+'-'+p[0].padStart(2,'0');
+  if(day>=8&&day<=22)return ym+' | A';
+  if(day>=23)return ym+' | B';
+  const d=new Date(parseInt(p[2]),parseInt(p[0])-1,1);
+  d.setMonth(d.getMonth()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+' | B';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FILE PARSING
+// ══════════════════════════════════════════════════════════════════
+function dDragOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('dragging')}
+function dDragLeave(){document.getElementById('drop-zone').classList.remove('dragging')}
+function dDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('dragging');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0])}
+function handleFile(e){if(e.target.files[0])processFile(e.target.files[0])}
+
+function processFile(file){
+  sourceFile=file.name;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      let hr=-1;
+      for(let i=0;i<Math.min(raw.length,10);i++){if(raw[i].some(c=>String(c).includes('Person ID'))){hr=i;break}}
+      if(hr===-1)throw new Error('Cannot find header row with "Person ID"');
+      const H=raw[hr].map(h=>String(h).trim());
+      const iID=H.findIndex(h=>h.includes('Person ID'));
+      const iNm=H.findIndex(h=>h.includes('Person Name'));
+      const iDt=H.findIndex(h=>h.includes('Punch Date'));
+      const iTm=H.findIndex(h=>h.includes('Attendance record')||h.includes('Time'));
+      if([iID,iNm,iDt,iTm].includes(-1))throw new Error('Missing required columns');
+      rawPunches=[];
+      for(let i=hr+1;i<raw.length;i++){
+        const r=raw[i];
+        if(!r[iID]||!r[iDt]||!r[iTm])continue;
+        rawPunches.push({employee_id:String(r[iID]).trim(),employee_name:String(r[iNm]).trim(),
+          punch_date:normDate(String(r[iDt]).trim()),punch_time:normTime(String(r[iTm]).trim())});
+      }
+      if(!rawPunches.length)throw new Error('No valid punch records found');
+      summarize();renderPreview();goTo(2);
+    }catch(err){document.getElementById('up-err').innerHTML=`<div class="alert alert-warn">⚠️ ${err.message}</div>`}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function normDate(d){
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(d))return d;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)){const[y,m,dd]=d.split('-');return`${m}/${dd}/${y}`}
+  if(/^\d{5,}$/.test(d)){const x=new Date((parseInt(d)-25569)*86400*1000);return`${String(x.getMonth()+1).padStart(2,'0')}/${String(x.getDate()).padStart(2,'0')}/${x.getFullYear()}`}
+  return d;
+}
+function normTime(t){
+  if(!t)return'';
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(t))return t.substring(0,5);
+  if(/^0\.\d+$/.test(t)){const s=Math.round(parseFloat(t)*86400);return`${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}`}
+  return t.substring(0,5);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PUNCH SUMMARIZER
+// ══════════════════════════════════════════════════════════════════
+function t2m(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return h*60+m}
+function m2t(m){return`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function r2(n){return Math.round(n*100)/100}
+
+function calcND(inM,outM,overnight){
+  const ND_S=22*60, ND_E=(24+6)*60;
+  let sIn=inM, sOut=overnight?outM+1440:outM;
+  const overlap=Math.max(Math.min(sOut,ND_E)-Math.max(sIn,ND_S),0);
+  let early=0;
+  if(!overnight&&inM<6*60)early=Math.max(Math.min(outM,6*60)-inM,0);
+  return(overlap+early)/60;
+}
+
+function weekOfMonth(day){return day<=7?1:day<=14?2:day<=21?3:4}
+
+function summarize(){
+  const grouped={};
+  rawPunches.forEach(r=>{
+    const k=`${r.employee_id}||${r.punch_date}`;
+    if(!grouped[k])grouped[k]=[];
+    grouped[k].push(r);
+  });
+  summaryRows=[];
+  Object.entries(grouped).forEach(([k,punches])=>{
+    const[empId,pDate]=k.split('||');
+    punches.sort((a,b)=>t2m(a.punch_time)-t2m(b.punch_time));
+    const tiStr=punches[0].punch_time, toStr=punches[punches.length-1].punch_time;
+    const tiM=t2m(tiStr), toM=t2m(toStr);
+    const overnight=(tiM>toM)&&punches.length>1;
+    const rawMins=overnight?(1440-tiM)+toM:toM-tiM;
+    const adjMins=rawMins>=240?rawMins-60:rawMins; // subtract 1hr break if >=4hrs
+    const totalHrs=r2(Math.max(adjMins/60,0));
+    const regHrs=r2(Math.min(totalHrs,8));
+    const otHrs=r2(Math.max(totalHrs-8,0));
+    const ndHrs=r2(calcND(tiM,toM,overnight));
+    const needsReview=punches.length===1||tiM===toM||totalHrs>16;
+    summaryRows.push({
+      employee_id:empId,employee_name:punches[0].employee_name,
+      work_date:pDate,time_in:tiStr,time_out:toStr,
+      total_hrs:totalHrs,regular_hrs:regHrs,ot_hrs:otHrs,nd_hrs:ndHrs,
+      is_overnight:overnight,punch_count:punches.length,
+      cutoff_label:getCutoffLabel(pDate),source_file:sourceFile,
+      needs_review:needsReview,all_punches:punches.map(p=>p.punch_time)
+    });
+  });
+  summaryRows.sort((a,b)=>dateCompare(a.work_date,b.work_date)||a.employee_name.localeCompare(b.employee_name));
+  allSummaryRows=[...summaryRows];
+  activeRows=[...summaryRows];
+}
+
+function dateCompare(a,b){
+  const p=s=>{const[m,d,y]=s.split('/');return new Date(y,m-1,d)};
+  return p(a)-p(b);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANALYTICS BUILDER
+// ══════════════════════════════════════════════════════════════════
+function buildAnalytics(){
+  employeeMap={};
+  allSummaryRows.forEach(row=>{
+    if(!employeeMap[row.employee_id]){
+      employeeMap[row.employee_id]={
+        id:row.employee_id,name:row.employee_name,rows:[],
+        totalHrs:0,regularHrs:0,otHrs:0,ndHrs:0,
+        daysWorked:0,otDays:0,ndDays:0,overnightDays:0,
+        totalPunches:0,maxDailyHrs:0,minDailyHrs:999,
+        monthly:{},weekly:[]
+      };
+    }
+    employeeMap[row.employee_id].rows.push(row);
+  });
+  // count raw punches per employee
+  rawPunches.forEach(r=>{if(employeeMap[r.employee_id])employeeMap[r.employee_id].totalPunches++});
+
+  Object.values(employeeMap).forEach(emp=>{
+    emp.rows.forEach(r=>{
+      emp.totalHrs+=r.total_hrs; emp.regularHrs+=r.regular_hrs;
+      emp.otHrs+=r.ot_hrs; emp.ndHrs+=r.nd_hrs;
+      emp.daysWorked++; if(r.ot_hrs>0)emp.otDays++; if(r.nd_hrs>0)emp.ndDays++;
+      if(r.is_overnight)emp.overnightDays++;
+      emp.maxDailyHrs=Math.max(emp.maxDailyHrs,r.total_hrs);
+      emp.minDailyHrs=Math.min(emp.minDailyHrs,r.total_hrs);
+    });
+    emp.totalHrs=r2(emp.totalHrs);emp.regularHrs=r2(emp.regularHrs);
+    emp.otHrs=r2(emp.otHrs);emp.ndHrs=r2(emp.ndHrs);
+    emp.avgDailyHrs=emp.daysWorked>0?r2(emp.totalHrs/emp.daysWorked):0;
+    emp.otRatePct=emp.daysWorked>0?r2(emp.otDays/emp.daysWorked*100):0;
+    emp.ndRatePct=emp.daysWorked>0?r2(emp.ndDays/emp.daysWorked*100):0;
+    if(emp.minDailyHrs===999)emp.minDailyHrs=0;
+
+    emp.rows.forEach(r=>{
+      const[mm,dd,yyyy]=r.work_date.split('/').map(Number);
+      const ym=`${yyyy}-${String(mm).padStart(2,'0')}`;
+      const wk=weekOfMonth(dd);
+      if(!emp.monthly[ym]){
+        emp.monthly[ym]={w1:{h:0,r:0,o:0,n:0,d:0},w2:{h:0,r:0,o:0,n:0,d:0},
+          w3:{h:0,r:0,o:0,n:0,d:0},w4:{h:0,r:0,o:0,n:0,d:0},total:{h:0,r:0,o:0,n:0,d:0}};
+      }
+      const wKey='w'+wk, M=emp.monthly[ym];
+      M[wKey].h+=r.total_hrs;M[wKey].r+=r.regular_hrs;M[wKey].o+=r.ot_hrs;M[wKey].n+=r.nd_hrs;M[wKey].d++;
+      M.total.h+=r.total_hrs;M.total.r+=r.regular_hrs;M.total.o+=r.ot_hrs;M.total.n+=r.nd_hrs;M.total.d++;
+    });
+    Object.values(emp.monthly).forEach(M=>{
+      ['w1','w2','w3','w4','total'].forEach(wk=>{
+        M[wk].h=r2(M[wk].h);M[wk].r=r2(M[wk].r);M[wk].o=r2(M[wk].o);M[wk].n=r2(M[wk].n);
+      });
+    });
+    Object.entries(emp.monthly).forEach(([ym,M])=>{
+      const[yr,mo]=ym.split('-').map(Number);
+      ['w1','w2','w3','w4'].forEach((wk,wi)=>{
+        const d=M[wk];
+        const ds=[1,8,15,22][wi];
+        const de=wi<3?ds+6:new Date(yr,mo,0).getDate();
+        emp.weekly.push({
+          yearMonth:ym,weekNum:wi+1,weekLabel:`Week ${wi+1} (${String(mo).padStart(2,'0')}/${ds}–${de})`,
+          hrs:d.h,regHrs:d.r,otHrs:d.o,ndHrs:d.n,days:d.d,
+          avgDailyHrs:d.d>0?r2(d.h/d.d):0,
+          dateFrom:`${ym}-${String(ds).padStart(2,'0')}`,dateTo:`${ym}-${String(de).padStart(2,'0')}`,
+          cutoffLabel:allSummaryRows[0]?.cutoff_label||''
+        });
+      });
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PREVIEW RENDER
+// ══════════════════════════════════════════════════════════════════
+function renderPreview(){
+  const rows=allSummaryRows;
+  const empCt=new Set(rows.map(r=>r.employee_id)).size;
+  const dayCt=new Set(rows.map(r=>r.work_date)).size;
+  const otCt=rows.filter(r=>r.ot_hrs>0).length;
+  const ndCt=rows.filter(r=>r.nd_hrs>0).length;
+  const warnCt=rows.filter(r=>r.needs_review).length;
+  document.getElementById('prev-sub').textContent=`${rows.length} records · ${empCt} employees · ${dayCt} days · ${sourceFile}`;
+  document.getElementById('stat-row').innerHTML=`
+    <div class="stat-card"><div class="sc-label">Employees</div><div class="sc-value">${empCt}</div><div class="sc-sub">${rows.length} day-records</div></div>
+    <div class="stat-card"><div class="sc-label">Working Days</div><div class="sc-value">${dayCt}</div><div class="sc-sub">Dates with punches</div></div>
+    <div class="stat-card ok"><div class="sc-label">OT Records</div><div class="sc-value">${otCt}</div><div class="sc-sub">Days with overtime</div></div>
+    <div class="stat-card ok"><div class="sc-label">Night Diff</div><div class="sc-value">${ndCt}</div><div class="sc-sub">ND records</div></div>
+    <div class="stat-card ${warnCt>0?'warn':''}"><div class="sc-label">Needs Review</div><div class="sc-value">${warnCt}</div><div class="sc-sub">Single punch or odd hours</div></div>`;
+  const az=document.getElementById('alerts-zone');az.innerHTML='';
+  if(warnCt>0)az.innerHTML+=`<div class="alert alert-warn">⚠️ <strong>${warnCt} records flagged</strong> — possible missing punch-in or punch-out.</div>`;
+  if(rows.filter(r=>r.is_overnight).length>0)az.innerHTML+=`<div class="alert alert-info">🌙 <strong>Overnight shifts detected</strong> — time crossed midnight. Night diff applied to 22:00–06:00 hours.</div>`;
+  activeRows=[...allSummaryRows];
+  renderTable(activeRows);
+}
+
+function renderTable(rows){
+  const showPunches=document.getElementById('show-punches')?.checked;
+  const tbody=document.getElementById('prev-tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--muted)">No matching records</td></tr>`;return}
+  tbody.innerHTML=rows.map((row,i)=>{
+    const flags=[];
+    if(row.is_overnight)flags.push('<span class="badge b-night">🌙 Overnight</span>');
+    if(row.ot_hrs>0)flags.push(`<span class="badge b-ot">OT ${row.ot_hrs}h</span>`);
+    if(row.nd_hrs>0)flags.push(`<span class="badge b-nd">ND ${row.nd_hrs}h</span>`);
+    if(row.needs_review)flags.push('<span class="badge b-warn">⚠ Review</span>');
+    const punchDetail=showPunches?`<tr class="punch-detail-row"><td colspan="11"><div class="punch-detail-inner">
+      ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
+    </div></td></tr>`:'';
+    return`<tr data-idx="${i}" style="cursor:pointer" onclick="togglePunchRow(${i})">
+      <td class="td-id">${row.employee_id}</td><td class="td-name">${row.employee_name}</td>
+      <td class="td-date">${row.work_date}</td>
+      <td class="td-time in">${row.time_in}</td><td class="td-time out">${row.time_out}</td>
+      <td class="td-hrs">${row.total_hrs}h</td><td class="td-hrs">${row.regular_hrs}h</td>
+      <td class="td-hrs ot">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
+      <td class="td-hrs nd">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}${row.punch_count===1?' ⚠':''}</td>
+      <td>${flags.join(' ')}</td></tr>${punchDetail}`;
+  }).join('');
+}
+
+function togglePunchRow(idx){
+  const ex=document.getElementById(`pd-${idx}`);
+  if(ex){ex.remove();return}
+  const row=activeRows[idx];
+  const tr=document.querySelector(`tr[data-idx="${idx}"]`);
+  const det=document.createElement('tr');
+  det.id=`pd-${idx}`;det.className='punch-detail-row';
+  det.innerHTML=`<td colspan="11"><div class="punch-detail-inner">
+    ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
+  </div></td>`;
+  tr.after(det);
+}
+
+function filterTable(){
+  const s=document.getElementById('search').value.toLowerCase();
+  const f=document.getElementById('filt-ot').value;
+  activeRows=allSummaryRows.filter(r=>{
+    const ms=!s||r.employee_name.toLowerCase().includes(s)||r.employee_id.includes(s);
+    const mf=f===''||
+      (f==='ot'&&r.ot_hrs>0)||(f==='nd'&&r.nd_hrs>0)||(f==='overnight'&&r.is_overnight)||(f==='warn'&&r.needs_review);
+    return ms&&mf;
+  });
+  renderTable(activeRows);
+}
+function sortTbl(col){
+  sortState.dir=sortState.col===col?(sortState.dir==='asc'?'desc':'asc'):'asc';
+  sortState.col=col;
+  activeRows.sort((a,b)=>{
+    let va=a[col],vb=b[col];
+    if(col==='work_date')return sortState.dir==='asc'?dateCompare(va,vb):dateCompare(vb,va);
+    if(typeof va==='number')return sortState.dir==='asc'?va-vb:vb-va;
+    return sortState.dir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+  renderTable(activeRows);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANALYTICS GRID
+// ══════════════════════════════════════════════════════════════════
+function renderGrid(){
+  const search=document.getElementById('emp-search')?.value.toLowerCase()||'';
+  const sortBy=document.getElementById('sort-by')?.value||'name';
+  let emps=Object.values(employeeMap).filter(e=>!search||e.name.toLowerCase().includes(search)||e.id.includes(search));
+  emps.sort((a,b)=>{
+    if(sortBy==='name')return a.name.localeCompare(b.name);
+    if(sortBy==='total_hrs')return b.totalHrs-a.totalHrs;
+    if(sortBy==='ot_hrs')return b.otHrs-a.otHrs;
+    if(sortBy==='nd_hrs')return b.ndHrs-a.ndHrs;
+    if(sortBy==='days')return b.daysWorked-a.daysWorked;
+    return a.name.localeCompare(b.name);
+  });
+  document.getElementById('analytics-sub').textContent=`${emps.length} employee${emps.length!==1?'s':''} · click to view detailed breakdown`;
+
+  if(gridView==='grid'){
+    document.getElementById('emp-grid').innerHTML=emps.map(emp=>renderEmpCard(emp)).join('');
+    document.getElementById('emp-grid').style.display='grid';
+    document.getElementById('emp-list-view').style.display='none';
+  } else {
+    renderEmpList(emps);
+    document.getElementById('emp-grid').style.display='none';
+    document.getElementById('emp-list-view').style.display='block';
+  }
+}
+
+function renderEmpCard(emp){
+  const initials=emp.name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+  // Get first month's week data for mini bars
+  const months=Object.entries(emp.monthly);
+  const mData=months.length>0?months[0][1]:null;
+  const weekHrs=mData?['w1','w2','w3','w4'].map(w=>mData[w].h):[0,0,0,0];
+  const maxWk=Math.max(...weekHrs,0.1);
+  const barColors=['#E8EAF6','#EEF4FE','#E8F5EE','#FFF3E0'];
+  const barActColors=['var(--indigo)','var(--blue)','var(--green)','#BF360C'];
+  const miniBars=weekHrs.map((h,i)=>`
+    <div class="ec-week-bar-col">
+      <div class="ec-week-bar" style="height:${Math.max(h/maxWk*28,2)}px;background:${h>0?barActColors[i]:barColors[i]}"></div>
+      <span class="ec-week-label">W${i+1}</span>
+    </div>`).join('');
+  const otColor=emp.otHrs>0?'var(--blue)':'var(--muted)';
+  const ndColor=emp.ndHrs>0?'var(--purple)':'var(--muted)';
+  return`<div class="emp-card" onclick="openDetail('${emp.id}')">
+    <div class="ec-header">
+      <div class="ec-avatar">${initials}</div>
+      <div><div class="ec-name">${emp.name}</div><div class="ec-id">#${emp.id}</div></div>
+    </div>
+    <div class="ec-stats">
+      <div class="ec-stat"><span class="ec-val">${emp.totalHrs}h</span><span class="ec-lbl">Total Hrs</span></div>
+      <div class="ec-stat"><span class="ec-val">${emp.daysWorked}</span><span class="ec-lbl">Days</span></div>
+      <div class="ec-stat"><span class="ec-val">${emp.avgDailyHrs}h</span><span class="ec-lbl">Avg/Day</span></div>
+    </div>
+    <div class="ec-badges">
+      ${emp.otHrs>0?`<span class="badge b-ot">OT ${emp.otHrs}h</span>`:''}
+      ${emp.ndHrs>0?`<span class="badge b-nd">ND ${emp.ndHrs}h</span>`:''}
+      ${emp.overnightDays>0?`<span class="badge b-night">🌙 ${emp.overnightDays}x</span>`:''}
+      ${emp.daysWorked===0?`<span class="badge b-warn">No Records</span>`:''}
+    </div>
+    <div class="ec-week-bars">${miniBars}</div>
+  </div>`;
+}
+
+function renderEmpList(emps){
+  const tbody=document.getElementById('emp-list-tbody');
+  tbody.innerHTML=emps.map(emp=>{
+    const months=Object.entries(emp.monthly);
+    const mData=months.length>0?months[0][1]:null;
+    const whs=mData?['w1','w2','w3','w4'].map(w=>mData[w].h):[0,0,0,0];
+    return`<tr style="cursor:pointer" onclick="openDetail('${emp.id}')">
+      <td class="td-id">${emp.id}</td>
+      <td style="font-weight:500">${emp.name}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.daysWorked}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-weight:600">${emp.totalHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.regularHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;color:var(--blue)">${emp.otHrs>0?emp.otHrs+'h':'–'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;color:var(--purple)">${emp.ndHrs>0?emp.ndHrs+'h':'–'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.avgDailyHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.otDays}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.overnightDays>0?emp.overnightDays:'–'}</td>
+      ${whs.map((h,i)=>`<td style="text-align:center;font-family:'DM Mono',monospace;font-size:11px">${h>0?h+'h':'–'}</td>`).join('')}
+    </tr>`;
+  }).join('');
+}
+
+function filterGrid(){renderGrid()}
+function setView(v){
+  gridView=v;
+  document.getElementById('view-grid').classList.toggle('active',v==='grid');
+  document.getElementById('view-list').classList.toggle('active',v==='list');
+  renderGrid();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EMPLOYEE DETAIL
+// ══════════════════════════════════════════════════════════════════
+function openDetail(empId){
+  const emp=employeeMap[empId];
+  if(!emp)return;
+  document.getElementById('emp-grid-view').style.display='none';
+  document.getElementById('emp-detail').style.display='block';
+
+  // Avatar + header
+  const initials=emp.name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+  document.getElementById('d-avatar').textContent=initials;
+  document.getElementById('d-name').textContent=emp.name;
+  document.getElementById('d-meta').innerHTML=`
+    <span>#${emp.id}</span>
+    <span>${emp.daysWorked} days worked</span>
+    <span>${emp.totalPunches} biometric taps</span>
+    <span>Cutoff: ${allSummaryRows.find(r=>r.employee_id===empId)?.cutoff_label||'—'}</span>`;
+
+  // KPIs
+  document.getElementById('d-kpi').innerHTML=`
+    <div class="kpi-card"><div class="kv">${emp.totalHrs}h</div><div class="kl">Total Hours</div></div>
+    <div class="kpi-card kpi-blue"><div class="kv">${emp.daysWorked}</div><div class="kl">Days Worked</div></div>
+    <div class="kpi-card kpi-green"><div class="kv">${emp.avgDailyHrs}h</div><div class="kl">Avg Per Day</div></div>
+    <div class="kpi-card kpi-blue"><div class="kv">${emp.otHrs}h</div><div class="kl">OT Hours (${emp.otRatePct}%)</div></div>
+    <div class="kpi-card kpi-purple"><div class="kv">${emp.ndHrs}h</div><div class="kl">Night Diff (${emp.ndRatePct}%)</div></div>
+    <div class="kpi-card kpi-gold"><div class="kv">${emp.maxDailyHrs}h</div><div class="kl">Peak Day</div></div>`;
+
+  // Breakdown table
+  const months=Object.entries(emp.monthly).sort((a,b)=>a[0].localeCompare(b[0]));
+  let breakdown=`<table class="breakdown"><thead><tr>
+    <th>Month</th>
+    <th class="w1-col">W1 (1–7)</th><th class="w2-col">W2 (8–14)</th>
+    <th class="w3-col">W3 (15–21)</th><th class="w4-col">W4 (22+)</th>
+    <th>Total</th><th>Days</th>
+  </tr></thead><tbody>`;
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-');
+    const mn=new Date(+y,+m-1,1).toLocaleString('default',{month:'long'});
+    const fmt=v=>v>0?`${v}h`:'–';
+    breakdown+=`<tr>
+      <td>${mn} ${y}</td>
+      <td class="w1-col">${fmt(M.w1.h)}${M.w1.o>0?`<br><small style="color:var(--blue)">+OT ${M.w1.o}h</small>`:''}</td>
+      <td class="w2-col">${fmt(M.w2.h)}${M.w2.o>0?`<br><small style="color:var(--blue)">+OT ${M.w2.o}h</small>`:''}</td>
+      <td class="w3-col">${fmt(M.w3.h)}${M.w3.o>0?`<br><small style="color:var(--blue)">+OT ${M.w3.o}h</small>`:''}</td>
+      <td class="w4-col">${fmt(M.w4.h)}${M.w4.o>0?`<br><small style="color:var(--blue)">+OT ${M.w4.o}h</small>`:''}</td>
+      <td><strong>${M.total.h}h</strong></td><td>${M.total.d}</td>
+    </tr>`;
+  });
+  breakdown+=`</tbody><tfoot><tr>
+    <td>TOTAL</td>
+    <td class="w1-col">${r2(months.reduce((s,[,M])=>s+M.w1.h,0))}h</td>
+    <td class="w2-col">${r2(months.reduce((s,[,M])=>s+M.w2.h,0))}h</td>
+    <td class="w3-col">${r2(months.reduce((s,[,M])=>s+M.w3.h,0))}h</td>
+    <td class="w4-col">${r2(months.reduce((s,[,M])=>s+M.w4.h,0))}h</td>
+    <td><strong>${emp.totalHrs}h</strong></td><td>${emp.daysWorked}</td>
+  </tr></tfoot></table>`;
+  document.getElementById('d-breakdown').innerHTML=breakdown;
+
+  // Bar chart
+  document.getElementById('d-chart').innerHTML=drawBarChart(emp);
+
+  // Calendar
+  let calHtml='';
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-').map(Number);
+    const mn=new Date(y,m-1,1).toLocaleString('default',{month:'long'});
+    calHtml+=`<div class="cal-month-label">${mn} ${y}</div>${drawCalendar(emp,y,m)}`;
+  });
+  document.getElementById('d-calendar').innerHTML=calHtml;
+
+  // Daily table
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const sorted=[...emp.rows].sort((a,b)=>dateCompare(a.work_date,b.work_date));
+  const maxH=Math.max(...sorted.map(r=>r.total_hrs),1);
+  document.getElementById('d-daily-tbody').innerHTML=sorted.map(row=>{
+    const[mm,dd,yyyy]=row.work_date.split('/').map(Number);
+    const dayName=days[new Date(yyyy,mm-1,dd).getDay()];
+    const wk=weekOfMonth(dd);
+    const wkColors=['var(--indigo)','var(--blue)','var(--green)','#BF360C'];
+    const barW=Math.round(row.regular_hrs/maxH*80);
+    const otBarW=Math.round(row.ot_hrs/maxH*80);
+    const flags=[];
+    if(row.is_overnight)flags.push('<span class="badge b-night" style="font-size:10px">🌙</span>');
+    if(row.ot_hrs>0)flags.push(`<span class="badge b-ot" style="font-size:10px">OT</span>`);
+    if(row.nd_hrs>0)flags.push(`<span class="badge b-nd" style="font-size:10px">ND</span>`);
+    if(row.needs_review)flags.push('<span class="badge b-warn" style="font-size:10px">⚠</span>');
+    return`<tr>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${row.work_date}</td>
+      <td style="font-size:11px;color:var(--muted)">${dayName}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${row.time_in}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${row.time_out}</td>
+      <td><div class="hrs-bar-wrap"><div class="hrs-bar" style="width:${barW}px"></div><span style="font-family:'DM Mono',monospace;font-size:12px">${row.total_hrs}h</span></div></td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${row.regular_hrs}h</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--blue)">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--purple)">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:10px;color:${wkColors[wk-1]};font-weight:600">W${wk}</span></td>
+      <td>${flags.join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function closeDetail(){
+  document.getElementById('emp-detail').style.display='none';
+  document.getElementById('emp-grid-view').style.display='block';
+}
+
+// ── BAR CHART SVG ──────────────────────────────────────────────
+function drawBarChart(emp){
+  const months=Object.entries(emp.monthly).sort((a,b)=>a[0].localeCompare(b[0]));
+  const bars=[];
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-').map(Number);
+    const shortMo=new Date(y,m-1,1).toLocaleString('default',{month:'short'});
+    ['w1','w2','w3','w4'].forEach((wk,wi)=>{
+      const d=M[wk];
+      bars.push({label:`W${wi+1}`,sub:`${shortMo}'${String(y).slice(2)}`,
+        reg:d.r,ot:d.o,nd:d.n,total:d.h,days:d.d,weekNum:wi+1});
+    });
+  });
+
+  const maxH=Math.max(...bars.map(b=>b.total),8);
+  const W=560, H=140, PAD_L=36, PAD_B=32, barW=Math.floor((W-PAD_L)/Math.max(bars.length,1)*0.7);
+  const barGap=Math.floor((W-PAD_L)/Math.max(bars.length,1));
+  const scale=v=>(v/maxH)*H;
+
+  // Y-axis guides
+  const yGuides=[0,maxH*0.25,maxH*0.5,maxH*0.75,maxH].map(v=>r2(v));
+  let yLines=yGuides.map(v=>{
+    const y=H-scale(v);
+    return`<line x1="${PAD_L}" y1="${y}" x2="${W}" y2="${y}" stroke="#F0EAD6" stroke-width="1"/>
+    <text x="${PAD_L-4}" y="${y+4}" text-anchor="end" font-size="9" fill="#9E9E9E" font-family="monospace">${Math.round(v)}h</text>`;
+  }).join('');
+
+  let svgBars=bars.map((b,i)=>{
+    const x=PAD_L+(i*barGap)+(barGap-barW)/2;
+    const rH=scale(b.reg), oH=scale(b.ot), nH=scale(b.nd);
+    const rY=H-rH, oY=rY-oH, nY=oY-nH;
+    const topY=b.total>0?Math.min(rY,oY,nY):H;
+    const wColors=['#3949AB','#1565C0','#1A7A4A','#BF360C'];
+    const barCol=wColors[b.weekNum-1];
+    return`
+      ${b.reg>0?`<rect x="${x}" y="${rY}" width="${barW}" height="${rH}" fill="${barCol}" rx="2" opacity="0.7"/>`:''}
+      ${b.ot>0?`<rect x="${x}" y="${oY}" width="${barW}" height="${oH}" fill="var(--blue)" rx="2"/>`:''}
+      ${b.nd>0?`<rect x="${x}" y="${nY}" width="${barW}" height="${nH}" fill="var(--purple)" rx="2"/>`:''}
+      ${b.days===0?`<rect x="${x}" y="${H-4}" width="${barW}" height="4" fill="#E0E0E0" rx="2"/>`:''}
+      ${b.total>0?`<text x="${x+barW/2}" y="${topY-4}" text-anchor="middle" font-size="8.5" fill="#555" font-family="monospace" font-weight="600">${b.total}h</text>`:''}
+      <text x="${x+barW/2}" y="${H+14}" text-anchor="middle" font-size="9" fill="#9E9E9E" font-family="monospace">${b.label}</text>
+      <text x="${x+barW/2}" y="${H+24}" text-anchor="middle" font-size="8" fill="#BDBDBD" font-family="monospace">${b.sub}</text>`;
+  }).join('');
+
+  return`<svg width="100%" viewBox="0 0 ${W} ${H+PAD_B+4}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${PAD_L}" y1="0" x2="${PAD_L}" y2="${H}" stroke="#E0E0E0" stroke-width="1"/>
+    <line x1="${PAD_L}" y1="${H}" x2="${W}" y2="${H}" stroke="#E0E0E0" stroke-width="1"/>
+    ${yLines}${svgBars}
+  </svg>`;
+}
+
+// ── CALENDAR HEATMAP ──────────────────────────────────────────
+function drawCalendar(emp,year,month){
+  const daysInMonth=new Date(year,month,0).getDate();
+  const firstDay=new Date(year,month-1,1).getDay();
+  const dayLookup={};
+  emp.rows.forEach(r=>{
+    const[mm,dd,yyyy]=r.work_date.split('/').map(Number);
+    if(yyyy===year&&mm===month)dayLookup[dd]=r;
+  });
+
+  const dayHeaders=['S','M','T','W','T','F','S'].map(d=>`<div class="cal-day-header">${d}</div>`).join('');
+  let cells=Array(firstDay).fill('<div class="cal-cell empty"></div>').join('');
+
+  for(let d=1;d<=daysInMonth;d++){
+    const row=dayLookup[d];
+    let bg='#EEEEEE', textColor='#999';
+    if(row){
+      textColor='white';
+      if(row.is_overnight)bg='#E65100';
+      else if(row.nd_hrs>0)bg=`var(--purple)`;
+      else if(row.ot_hrs>0)bg=`var(--blue)`;
+      else if(row.total_hrs>=8)bg=`var(--green)`;
+      else if(row.total_hrs>0)bg=`#81C784`;
+    }
+    const title=row?`${row.total_hrs}h worked (${row.time_in}–${row.time_out})`:d;
+    const hrsLabel=row&&row.total_hrs>0?`<span class="ch" style="color:${textColor};opacity:.85">${row.total_hrs}h</span>`:'';
+    cells+=`<div class="cal-cell" style="background:${bg}" title="${title}">
+      <span class="cn" style="color:${textColor}">${d}</span>${hrsLabel}
+    </div>`;
+  }
+  return`<div class="cal-grid" style="margin-bottom:16px">${dayHeaders}${cells}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CONFIRM & WRITE TO SHEETS
+// ══════════════════════════════════════════════════════════════════
+function renderConfirm(){
+  const emps=Object.keys(employeeMap).length;
+  const warnCt=allSummaryRows.filter(r=>r.needs_review).length;
+  document.getElementById('confirm-grid').innerHTML=`
+    <div class="cg-item"><div class="cg-label">Day Records</div><div class="cg-value">${allSummaryRows.length}</div></div>
+    <div class="cg-item"><div class="cg-label">Employees</div><div class="cg-value">${emps}</div></div>
+    <div class="cg-item"><div class="cg-label">OT Records</div><div class="cg-value">${allSummaryRows.filter(r=>r.ot_hrs>0).length}</div></div>
+    <div class="cg-item"><div class="cg-label">Raw Punches</div><div class="cg-value">${rawPunches.length}</div></div>
+    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${Object.values(employeeMap).reduce((s,e)=>s+Object.keys(e.monthly).length,0)}</div></div>
+    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${Object.values(employeeMap).reduce((s,e)=>s+e.weekly.length,0)}</div></div>`;
+  document.getElementById('url-display').textContent=sheetsUrl||'not configured';
+  document.getElementById('no-url-warn').style.display=sheetsUrl?'none':'flex';
+  document.getElementById('confirm-btn').disabled=!sheetsUrl;
+}
+
+async function writeToSheets(){
+  if(!sheetsUrl){openSettings();return}
+  const btn=document.getElementById('confirm-btn');
+  const bar=document.getElementById('prog-bar');
+  const fill=document.getElementById('prog-fill');
+  const msg=document.getElementById('status-msg');
+  btn.disabled=true;btn.textContent='Writing…';bar.classList.add('active');
+  const now=new Date().toISOString();
+
+  const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
+  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now]);
+
+  // Monthly analytics rows
+  const monthlyRows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    Object.entries(emp.monthly).forEach(([ym,M])=>{
+      monthlyRows.push([
+        emp.id,emp.name,ym,
+        M.w1.h,M.w1.r,M.w1.o,M.w1.n,M.w1.d,
+        M.w2.h,M.w2.r,M.w2.o,M.w2.n,M.w2.d,
+        M.w3.h,M.w3.r,M.w3.o,M.w3.n,M.w3.d,
+        M.w4.h,M.w4.r,M.w4.o,M.w4.n,M.w4.d,
+        M.total.h,M.total.r,M.total.o,M.total.n,
+        M.total.d,emp.avgDailyHrs,emp.otRatePct,emp.ndRatePct,
+        emp.maxDailyHrs,emp.minDailyHrs,emp.overnightDays,emp.totalPunches,
+        allSummaryRows[0]?.cutoff_label||'',now
+      ]);
+    });
+  });
+
+  // Weekly rows
+  const weeklyRows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    emp.weekly.forEach(w=>{
+      weeklyRows.push([emp.id,emp.name,w.yearMonth,w.weekNum,w.weekLabel,
+        w.hrs,w.regHrs,w.otHrs,w.ndHrs,w.days,w.avgDailyHrs,
+        w.dateFrom,w.dateTo,w.cutoffLabel,now]);
+    });
+  });
+
+  const steps=[
+    ['03_RawPunches',rawRows,20,'Writing raw punches…'],
+    ['04_DailySummary',dailyRows,50,'Writing daily summary…'],
+    ['05_EmployeeMonthly',monthlyRows,75,'Writing monthly analytics…'],
+    ['06_EmployeeWeekly',weeklyRows,100,'Writing weekly analytics…'],
+  ];
+
+  try{
+    for(const[sheet,rows,pct,label] of steps){
+      msg.textContent=label;fill.style.width=`${pct/4}%`;
+      await post(sheet,rows);
+      fill.style.width=`${pct}%`;
+    }
+    msg.textContent=`✓ All done! ${rawRows.length} punches · ${dailyRows.length} daily · ${monthlyRows.length} monthly · ${weeklyRows.length} weekly rows written.`;
+    msg.className='status-msg ok';
+    setTimeout(()=>{
+      document.getElementById('done-msg').textContent=`${dailyRows.length} daily records, ${monthlyRows.length} monthly analytics, and ${weeklyRows.length} weekly breakdowns saved to Google Sheets.`;
+      const lnk=document.getElementById('open-link');
+      lnk.href=sheetsLink||'#';lnk.style.display=sheetsLink?'':'none';
+      goTo(5);
+    },1400);
+  }catch(err){
+    fill.style.width='0%';msg.textContent=`Error: ${err.message}`;msg.className='status-msg err';
+    btn.disabled=false;btn.textContent='✓ Write to Google Sheets';
+  }
+}
+
+async function post(sheet,rows){
+  const r=await fetch(sheetsUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sheet_name:sheet,rows})});
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
+  const d=await r.json();
+  if(d.status!=='ok')throw new Error(d.error||'Unknown error');
+  return d;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════════════════════
+function openSettings(){
+  document.getElementById('url-input').value=sheetsUrl;
+  document.getElementById('link-input').value=sheetsLink;
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings(){document.getElementById('settings-modal').classList.remove('open')}
+function saveSettings(){
+  sheetsUrl=document.getElementById('url-input').value.trim();
+  sheetsLink=document.getElementById('link-input').value.trim();
+  localStorage.setItem('sheetsUrl',sheetsUrl);localStorage.setItem('sheetsLink',sheetsLink);
+  closeSettings();
+}
+document.getElementById('settings-modal').addEventListener('click',e=>{if(e.target===document.getElementById('settings-modal'))closeSettings()});
+function resetAll(){
+  rawPunches=[];summaryRows=[];allSummaryRows=[];activeRows=[];employeeMap={};sourceFile='';
+  document.getElementById('fi').value='';document.getElementById('up-err').innerHTML='';
+  goTo(1);
+}
+</script>
+</body>
+</html>
