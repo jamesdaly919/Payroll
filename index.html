@@ -79,6 +79,9 @@ table.pt{width:100%;border-collapse:collapse;font-size:12.5px}
 table.pt thead tr{background:var(--navy)}
 table.pt thead th{color:rgba(255,255,255,.65);text-align:left;padding:10px 13px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,.05);cursor:pointer;user-select:none}
 table.pt thead th:hover{color:white}
+table.pt thead th.sort-asc::after{content:' ↑';color:var(--gold);font-size:9px}
+table.pt thead th.sort-desc::after{content:' ↓';color:var(--gold);font-size:9px}
+table.pt thead th.sortable{cursor:pointer}
 table.pt tbody tr{border-bottom:1px solid #F5F0E8;transition:background .1s}
 table.pt tbody tr:hover{background:#FAFBFF}
 table.pt tbody td{padding:9px 13px;vertical-align:middle}
@@ -465,6 +468,7 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
       <option value="ot">Has Overtime</option>
       <option value="nd">Has Night Diff</option>
       <option value="overnight">Overnight</option>
+      <option value="tail">🌙 Overnight Tail</option>
       <option value="warn">Needs Review</option>
     </select>
     <label><input type="checkbox" id="show-punches" onchange="renderTable(activeRows)"> Show all punches</label>
@@ -472,17 +476,17 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
   <div class="table-wrap">
     <table class="pt">
       <thead><tr>
-        <th onclick="sortTbl('employee_id')">Emp ID</th>
-        <th onclick="sortTbl('employee_name')">Name</th>
-        <th onclick="sortTbl('work_date')">Date</th>
-        <th onclick="sortTbl('time_in')">Time In</th>
-        <th onclick="sortTbl('time_out')">Time Out</th>
-        <th onclick="sortTbl('total_hrs')">Total</th>
-        <th onclick="sortTbl('regular_hrs')">Reg</th>
-        <th onclick="sortTbl('ot_hrs')">OT</th>
-        <th onclick="sortTbl('nd_hrs')">ND</th>
-        <th>Punches</th>
-        <th>Flags</th>
+        <th class="sortable" onclick="sortTbl('employee_id')" data-col="employee_id">Emp ID</th>
+        <th class="sortable" onclick="sortTbl('employee_name')" data-col="employee_name">Name</th>
+        <th class="sortable" onclick="sortTbl('work_date')" data-col="work_date">Date</th>
+        <th class="sortable" onclick="sortTbl('time_in')" data-col="time_in">Time In</th>
+        <th class="sortable" onclick="sortTbl('time_out')" data-col="time_out">Time Out</th>
+        <th class="sortable" onclick="sortTbl('total_hrs')" data-col="total_hrs">Total</th>
+        <th class="sortable" onclick="sortTbl('regular_hrs')" data-col="regular_hrs">Reg</th>
+        <th class="sortable" onclick="sortTbl('ot_hrs')" data-col="ot_hrs">OT</th>
+        <th class="sortable" onclick="sortTbl('nd_hrs')" data-col="nd_hrs">ND</th>
+        <th class="sortable" onclick="sortTbl('punch_count')" data-col="punch_count">Punches</th>
+        <th class="sortable" onclick="sortTbl('flag_priority')" data-col="flag_priority">Flags</th>
         <th></th>
       </tr></thead>
       <tbody id="prev-tbody"></tbody>
@@ -603,6 +607,1720 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 <div class="panel" id="panel-4">
   <div class="confirm-box" style="max-width:780px">
     <h2>Save to Google Sheets</h2>
+    <p>This writes all parsed data directly into your Google Sheets backend — permanently. Each cutoff you process adds new rows without overwriting existing ones.</p>
+
+    <div class="confirm-grid" id="confirm-grid"></div>
+
+    <div class="sheets-write-list" style="text-align:left">
+      <div class="sw-item"><span class="sw-tab">03_RawPunches</span><span class="sw-desc">Every individual biometric tap</span></div>
+      <div class="sw-item"><span class="sw-tab">04_DailySummary</span><span class="sw-desc">Computed daily hours per employee</span></div>
+      <div class="sw-item"><span class="sw-tab">05_EmployeeMonthly</span><span class="sw-desc">Monthly totals with week-by-week breakdown</span></div>
+      <div class="sw-item"><span class="sw-tab">06_EmployeeWeekly</span><span class="sw-desc">One row per employee per week</span></div>
+    </div>
+
+    <div id="conn-status" class="alert alert-info" style="text-align:left;display:none">
+      <span id="conn-msg"></span>
+    </div>
+
+    <div class="progress-bar" id="prog-bar"><div class="progress-fill" id="prog-fill"></div></div>
+    <div class="status-msg" id="status-msg"></div>
+
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="goTo(3)">← Back</button>
+      <button class="btn btn-ghost" id="test-btn" onclick="testConn()" style="font-size:12px">🔌 Test Connection</button>
+      <button class="btn btn-confirm" id="confirm-btn" onclick="writeToSheets()">✓ Save to Google Sheets</button>
+    </div>
+
+    <p style="margin-top:14px;font-size:11px;color:var(--muted)">
+      One batch write · all 4 sheets in a single request
+    </p>
+  </div>
+</div>
+
+<!-- ═══ PANEL 5: DONE ═══ -->
+<div class="panel" id="panel-5">
+  <div class="done-box">
+    <div class="di">✅</div>
+    <h2>Saved to Sheets!</h2>
+    <p id="done-msg">All data written to your Google Sheets backend.</p>
+    <div style="background:var(--sand);border-radius:12px;padding:20px 24px;margin-bottom:24px;text-align:left;max-width:480px;margin-left:auto;margin-right:auto">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px">Your data is now live in Google Sheets</div>
+      <div style="font-size:13px;color:var(--text);line-height:2">
+        Every cutoff you process accumulates in the same sheet.<br>
+        Open <strong>05_EmployeeMonthly</strong> or <strong>06_EmployeeWeekly</strong> to see trends build up over time.
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="resetAll()">Process Another Cutoff</button>
+      <button class="btn btn-ghost" onclick="openArchive()">📂 View Archive</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS BACKEND — hardcoded URL, same pattern as Operations Hub
+// ══════════════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw1JtzdlQ4eDN7jq8wE8pocqcOWafKmA_Q8shJF1mx6M-GV1HGbF0XNznYEsoMdR85ECw/exec';
+
+// ══════════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════════
+let rawPunches=[], summaryRows=[], allSummaryRows=[], activeRows=[];
+let employeeMap={};
+let currentStep=1, selectedCutoff='A', sourceFile='';
+let sortState={col:'work_date',dir:'asc'};
+let gridView='grid';
+
+// ══════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════════════════
+function goTo(n){
+  if(n>1&&summaryRows.length===0)return;
+  currentStep=n;
+  document.querySelectorAll('.panel').forEach((p,i)=>p.classList.toggle('active',i+1===n));
+  document.querySelectorAll('.step-tab').forEach((t,i)=>{
+    t.classList.remove('active','done');
+    if(i+1<n)t.classList.add('done');
+    if(i+1===n)t.classList.add('active');
+  });
+  if(n===3&&Object.keys(employeeMap).length===0)buildAnalytics();
+  if(n===3){renderGrid();closeDetail();showSaveBanner();}
+  if(n===4)renderConfirm();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CUTOFF
+// ══════════════════════════════════════════════════════════════════
+function selCutoff(c){
+  selectedCutoff=c;
+  document.getElementById('co-a').classList.toggle('selected',c==='A');
+  document.getElementById('co-b').classList.toggle('selected',c==='B');
+}
+function getCutoffLabel(dateStr){
+  const p=dateStr.split('/');
+  const day=parseInt(p[1]),ym=p[2]+'-'+p[0].padStart(2,'0');
+  if(day>=8&&day<=22)return ym+' | A';
+  if(day>=23)return ym+' | B';
+  const d=new Date(parseInt(p[2]),parseInt(p[0])-1,1);
+  d.setMonth(d.getMonth()-1);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+' | B';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// FILE PARSING
+// ══════════════════════════════════════════════════════════════════
+function dDragOver(e){e.preventDefault();document.getElementById('drop-zone').classList.add('dragging')}
+function dDragLeave(){document.getElementById('drop-zone').classList.remove('dragging')}
+function dDrop(e){e.preventDefault();document.getElementById('drop-zone').classList.remove('dragging');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0])}
+function handleFile(e){if(e.target.files[0])processFile(e.target.files[0])}
+
+function processFile(file){
+  sourceFile=file.name;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      let hr=-1;
+      for(let i=0;i<Math.min(raw.length,10);i++){if(raw[i].some(c=>String(c).includes('Person ID'))){hr=i;break}}
+      if(hr===-1)throw new Error('Cannot find header row with "Person ID"');
+      const H=raw[hr].map(h=>String(h).trim());
+      const iID=H.findIndex(h=>h.includes('Person ID'));
+      const iNm=H.findIndex(h=>h.includes('Person Name'));
+      const iDt=H.findIndex(h=>h.includes('Punch Date'));
+      const iTm=H.findIndex(h=>h.includes('Attendance record')||h.includes('Time'));
+      if([iID,iNm,iDt,iTm].includes(-1))throw new Error('Missing required columns');
+      rawPunches=[];
+      for(let i=hr+1;i<raw.length;i++){
+        const r=raw[i];
+        if(!r[iID]||!r[iDt]||!r[iTm])continue;
+        rawPunches.push({employee_id:String(r[iID]).trim(),employee_name:String(r[iNm]).trim(),
+          punch_date:normDate(String(r[iDt]).trim()),punch_time:normTime(String(r[iTm]).trim())});
+      }
+      if(!rawPunches.length)throw new Error('No valid punch records found');
+      summarize();renderPreview();goTo(2);
+    }catch(err){document.getElementById('up-err').innerHTML=`<div class="alert alert-warn">⚠️ ${err.message}</div>`}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function normDate(d){
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(d))return d;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)){const[y,m,dd]=d.split('-');return`${m}/${dd}/${y}`}
+  if(/^\d{5,}$/.test(d)){const x=new Date((parseInt(d)-25569)*86400*1000);return`${String(x.getMonth()+1).padStart(2,'0')}/${String(x.getDate()).padStart(2,'0')}/${x.getFullYear()}`}
+  return d;
+}
+function normTime(t){
+  if(!t)return'';
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(t))return t.substring(0,5);
+  if(/^0\.\d+$/.test(t)){const s=Math.round(parseFloat(t)*86400);return`${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}`}
+  return t.substring(0,5);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PUNCH SUMMARIZER
+// ══════════════════════════════════════════════════════════════════
+function t2m(t){if(!t)return 0;const[h,m]=t.split(':').map(Number);return h*60+m}
+function m2t(m){return`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function r2(n){return Math.round(n*100)/100}
+
+function calcND(inM,outM,overnight){
+  const ND_S=22*60, ND_E=(24+6)*60;
+  let sIn=inM, sOut=overnight?outM+1440:outM;
+  const overlap=Math.max(Math.min(sOut,ND_E)-Math.max(sIn,ND_S),0);
+  let early=0;
+  if(!overnight&&inM<6*60)early=Math.max(Math.min(outM,6*60)-inM,0);
+  return(overlap+early)/60;
+}
+
+function weekOfMonth(day){return day<=7?1:day<=14?2:day<=21?3:4}
+
+function summarize(){
+  const grouped={};
+  rawPunches.forEach(r=>{
+    const k=`${r.employee_id}||${r.punch_date}`;
+    if(!grouped[k])grouped[k]=[];
+    grouped[k].push(r);
+  });
+  summaryRows=[];
+  Object.entries(grouped).forEach(([k,punches])=>{
+    const[empId,pDate]=k.split('||');
+    punches.sort((a,b)=>t2m(a.punch_time)-t2m(b.punch_time));
+    const tiStr=punches[0].punch_time, toStr=punches[punches.length-1].punch_time;
+    const tiM=t2m(tiStr), toM=t2m(toStr);
+    const overnight=(tiM>toM)&&punches.length>1;
+    const rawMins=overnight?(1440-tiM)+toM:toM-tiM;
+    const adjMins=rawMins>=240?rawMins-60:rawMins; // subtract 1hr break if >=4hrs
+    const totalHrs=r2(Math.max(adjMins/60,0));
+    const regHrs=r2(Math.min(totalHrs,8));
+    const otHrs=r2(Math.max(totalHrs-8,0));
+    const ndHrs=r2(calcND(tiM,toM,overnight));
+    const needsReview=punches.length===1||tiM===toM||totalHrs>16;
+    // Detect overnight tail: single punch early morning — likely belongs to previous day's shift
+    const isOvernightTail=punches.length===1 && tiM<8*60; // single punch before 08:00
+    summaryRows.push({
+      employee_id:empId,employee_name:punches[0].employee_name,
+      work_date:pDate,time_in:tiStr,time_out:toStr,
+      total_hrs:totalHrs,regular_hrs:regHrs,ot_hrs:otHrs,nd_hrs:ndHrs,
+      is_overnight:overnight,punch_count:punches.length,
+      cutoff_label:getCutoffLabel(pDate),source_file:sourceFile,
+      needs_review:needsReview,is_overnight_tail:isOvernightTail,
+      all_punches:punches.map(p=>p.punch_time)
+    });
+  });
+  summaryRows.sort((a,b)=>dateCompare(a.work_date,b.work_date)||a.employee_name.localeCompare(b.employee_name));
+  allSummaryRows=[...summaryRows];
+  activeRows=[...summaryRows];
+}
+
+function dateCompare(a,b){
+  const p=s=>{const[m,d,y]=s.split('/');return new Date(y,m-1,d)};
+  return p(a)-p(b);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANALYTICS BUILDER
+// ══════════════════════════════════════════════════════════════════
+function buildAnalytics(){
+  employeeMap={};
+  allSummaryRows.forEach(row=>{
+    if(!employeeMap[row.employee_id]){
+      employeeMap[row.employee_id]={
+        id:row.employee_id,name:row.employee_name,rows:[],
+        totalHrs:0,regularHrs:0,otHrs:0,ndHrs:0,
+        daysWorked:0,otDays:0,ndDays:0,overnightDays:0,
+        totalPunches:0,maxDailyHrs:0,minDailyHrs:999,
+        monthly:{},weekly:[]
+      };
+    }
+    employeeMap[row.employee_id].rows.push(row);
+  });
+  // count raw punches per employee
+  rawPunches.forEach(r=>{if(employeeMap[r.employee_id])employeeMap[r.employee_id].totalPunches++});
+
+  Object.values(employeeMap).forEach(emp=>{
+    emp.rows.forEach(r=>{
+      emp.totalHrs+=r.total_hrs; emp.regularHrs+=r.regular_hrs;
+      emp.otHrs+=r.ot_hrs; emp.ndHrs+=r.nd_hrs;
+      emp.daysWorked++; if(r.ot_hrs>0)emp.otDays++; if(r.nd_hrs>0)emp.ndDays++;
+      if(r.is_overnight)emp.overnightDays++;
+      emp.maxDailyHrs=Math.max(emp.maxDailyHrs,r.total_hrs);
+      emp.minDailyHrs=Math.min(emp.minDailyHrs,r.total_hrs);
+    });
+    emp.totalHrs=r2(emp.totalHrs);emp.regularHrs=r2(emp.regularHrs);
+    emp.otHrs=r2(emp.otHrs);emp.ndHrs=r2(emp.ndHrs);
+    emp.avgDailyHrs=emp.daysWorked>0?r2(emp.totalHrs/emp.daysWorked):0;
+    emp.otRatePct=emp.daysWorked>0?r2(emp.otDays/emp.daysWorked*100):0;
+    emp.ndRatePct=emp.daysWorked>0?r2(emp.ndDays/emp.daysWorked*100):0;
+    if(emp.minDailyHrs===999)emp.minDailyHrs=0;
+
+    emp.rows.forEach(r=>{
+      const[mm,dd,yyyy]=r.work_date.split('/').map(Number);
+      const ym=`${yyyy}-${String(mm).padStart(2,'0')}`;
+      const wk=weekOfMonth(dd);
+      if(!emp.monthly[ym]){
+        emp.monthly[ym]={w1:{h:0,r:0,o:0,n:0,d:0},w2:{h:0,r:0,o:0,n:0,d:0},
+          w3:{h:0,r:0,o:0,n:0,d:0},w4:{h:0,r:0,o:0,n:0,d:0},total:{h:0,r:0,o:0,n:0,d:0}};
+      }
+      const wKey='w'+wk, M=emp.monthly[ym];
+      M[wKey].h+=r.total_hrs;M[wKey].r+=r.regular_hrs;M[wKey].o+=r.ot_hrs;M[wKey].n+=r.nd_hrs;M[wKey].d++;
+      M.total.h+=r.total_hrs;M.total.r+=r.regular_hrs;M.total.o+=r.ot_hrs;M.total.n+=r.nd_hrs;M.total.d++;
+    });
+    Object.values(emp.monthly).forEach(M=>{
+      ['w1','w2','w3','w4','total'].forEach(wk=>{
+        M[wk].h=r2(M[wk].h);M[wk].r=r2(M[wk].r);M[wk].o=r2(M[wk].o);M[wk].n=r2(M[wk].n);
+      });
+    });
+    Object.entries(emp.monthly).forEach(([ym,M])=>{
+      const[yr,mo]=ym.split('-').map(Number);
+      ['w1','w2','w3','w4'].forEach((wk,wi)=>{
+        const d=M[wk];
+        const ds=[1,8,15,22][wi];
+        const de=wi<3?ds+6:new Date(yr,mo,0).getDate();
+        emp.weekly.push({
+          yearMonth:ym,weekNum:wi+1,weekLabel:`Week ${wi+1} (${String(mo).padStart(2,'0')}/${ds}–${de})`,
+          hrs:d.h,regHrs:d.r,otHrs:d.o,ndHrs:d.n,days:d.d,
+          avgDailyHrs:d.d>0?r2(d.h/d.d):0,
+          dateFrom:`${ym}-${String(ds).padStart(2,'0')}`,dateTo:`${ym}-${String(de).padStart(2,'0')}`,
+          cutoffLabel:allSummaryRows[0]?.cutoff_label||''
+        });
+      });
+    });
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════
+// PREVIEW RENDER
+// ══════════════════════════════════════════════════════════════════
+function renderPreview(){
+  const rows=allSummaryRows;
+  const empCt=new Set(rows.map(r=>r.employee_id)).size;
+  const dayCt=new Set(rows.map(r=>r.work_date)).size;
+  const otCt=rows.filter(r=>r.ot_hrs>0).length;
+  const ndCt=rows.filter(r=>r.nd_hrs>0).length;
+  const warnCt=rows.filter(r=>r.needs_review).length;
+  document.getElementById('prev-sub').textContent=`${rows.length} records · ${empCt} employees · ${dayCt} days · ${sourceFile}`;
+  document.getElementById('stat-row').innerHTML=`
+    <div class="stat-card"><div class="sc-label">Employees</div><div class="sc-value">${empCt}</div><div class="sc-sub">${rows.length} day-records</div></div>
+    <div class="stat-card"><div class="sc-label">Working Days</div><div class="sc-value">${dayCt}</div><div class="sc-sub">Dates with punches</div></div>
+    <div class="stat-card ok"><div class="sc-label">OT Records</div><div class="sc-value">${otCt}</div><div class="sc-sub">Days with overtime</div></div>
+    <div class="stat-card ok"><div class="sc-label">Night Diff</div><div class="sc-value">${ndCt}</div><div class="sc-sub">ND records</div></div>
+    <div class="stat-card ${warnCt>0?'warn':''}"><div class="sc-label">Needs Review</div><div class="sc-value">${warnCt}</div><div class="sc-sub">Single punch or odd hours</div></div>`;
+  const az=document.getElementById('alerts-zone');az.innerHTML='';
+  if(warnCt>0)az.innerHTML+=`<div class="alert alert-warn">⚠️ <strong>${warnCt} records flagged</strong> — possible missing punch-in or punch-out.</div>`;
+  if(rows.filter(r=>r.is_overnight).length>0)az.innerHTML+=`<div class="alert alert-info">🌙 <strong>Overnight shifts detected</strong> — time crossed midnight. Night diff applied to 22:00–06:00 hours.</div>`;
+  activeRows=[...allSummaryRows];
+  renderTable(activeRows);
+}
+
+function renderTable(rows){
+  const showPunches=document.getElementById('show-punches')?.checked;
+  const tbody=document.getElementById('prev-tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--muted)">No matching records</td></tr>`;return}
+  tbody.innerHTML=rows.map((row,i)=>{
+    const flags=[];
+    if(row.manually_edited)flags.push('<span class="badge" style="background:#E8F5EE;color:var(--green)">✎ edited</span>');
+    if(row.is_overnight)flags.push('<span class="badge b-night">🌙 Overnight</span>');
+    if(row.ot_hrs>0)flags.push(`<span class="badge b-ot">OT ${row.ot_hrs}h</span>`);
+    if(row.nd_hrs>0)flags.push(`<span class="badge b-nd">ND ${row.nd_hrs}h</span>`);
+    if(row.is_overnight_tail){
+      flags.push(`<span class="badge" style="background:#FFF3E0;color:#E65100;cursor:pointer" onclick="event.stopPropagation();openOvernightTailModal('${row.employee_id}','${row.work_date}')">🌙 Overnight tail?</span>`);
+    } else if(row.needs_review){
+      flags.push(`<span class="badge b-warn" style="cursor:pointer" onclick="event.stopPropagation();openPunchModal('${row.employee_id}','${row.work_date}')">⚠ Review / Edit</span>`);
+    }
+    const punchDetail=showPunches?`<tr class="punch-detail-row"><td colspan="11"><div class="punch-detail-inner">
+      ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
+    </div></td></tr>`:'';
+    return`<tr data-idx="${i}" style="cursor:pointer" onclick="togglePunchRow(${i})">
+      <td class="td-id">${row.employee_id}</td><td class="td-name">${row.employee_name}</td>
+      <td class="td-date">${row.work_date}</td>
+      <td class="td-time in">${row.time_in}</td><td class="td-time out">${row.time_out}</td>
+      <td class="td-hrs">${row.total_hrs}h</td><td class="td-hrs">${row.regular_hrs}h</td>
+      <td class="td-hrs ot">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
+      <td class="td-hrs nd">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}${row.punch_count===1?' ⚠':''}</td>
+      <td>${flags.join(' ')}</td><td><button class='btn btn-ghost' style='font-size:10px;padding:3px 8px;min-height:26px' onclick="event.stopPropagation();openPunchModal('${row.employee_id}','${row.work_date}')">✎ Edit</button></td></tr>${punchDetail}`;
+  }).join('');
+}
+
+function togglePunchRow(idx){
+  const ex=document.getElementById(`pd-${idx}`);
+  if(ex){ex.remove();return}
+  const row=activeRows[idx];
+  const tr=document.querySelector(`tr[data-idx="${idx}"]`);
+  const det=document.createElement('tr');
+  det.id=`pd-${idx}`;det.className='punch-detail-row';
+  det.innerHTML=`<td colspan="11"><div class="punch-detail-inner">
+    ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
+  </div></td>`;
+  tr.after(det);
+}
+
+function filterTable(){
+  const s=document.getElementById('search').value.toLowerCase();
+  const f=document.getElementById('filt-ot').value;
+  activeRows=allSummaryRows.filter(r=>{
+    const ms=!s||r.employee_name.toLowerCase().includes(s)||r.employee_id.includes(s);
+    const mf=f===''||
+      (f==='ot'&&r.ot_hrs>0)||(f==='nd'&&r.nd_hrs>0)||(f==='overnight'&&r.is_overnight)||(f==='tail'&&r.is_overnight_tail)||(f==='warn'&&r.needs_review);
+    return ms&&mf;
+  });
+  renderTable(activeRows);
+}
+function getFlagPriority(row){
+  // Higher number = more urgent = sorts first on asc
+  if(row.needs_review && row.punch_count===1) return 4;     // single punch (likely overnight tail)
+  if(row.needs_review) return 3;                             // other review flags
+  if(row.is_overnight) return 2;                             // overnight detected
+  if(row.ot_hrs>0 || row.nd_hrs>0) return 1;               // has OT/ND
+  return 0;
+}
+
+function sortTbl(col){
+  sortState.dir=sortState.col===col?(sortState.dir==='asc'?'desc':'asc'):'asc';
+  sortState.col=col;
+  activeRows.sort((a,b)=>{
+    let va, vb;
+    if(col==='flag_priority'){va=getFlagPriority(a);vb=getFlagPriority(b);}
+    else{va=a[col];vb=b[col];}
+    if(col==='work_date')return sortState.dir==='asc'?dateCompare(va,vb):dateCompare(vb,va);
+    if(typeof va==='number')return sortState.dir==='asc'?va-vb:vb-va;
+    return sortState.dir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+  // Update visual sort indicators
+  document.querySelectorAll('table.pt thead th[data-col]').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.col===col){
+      th.classList.add(sortState.dir==='asc'?'sort-asc':'sort-desc');
+    }
+  });
+  renderTable(activeRows);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ANALYTICS GRID
+// ══════════════════════════════════════════════════════════════════
+function renderGrid(){
+  const search=document.getElementById('emp-search')?.value.toLowerCase()||'';
+  const sortBy=document.getElementById('sort-by')?.value||'name';
+  let emps=Object.values(employeeMap).filter(e=>!search||e.name.toLowerCase().includes(search)||e.id.includes(search));
+  emps.sort((a,b)=>{
+    if(sortBy==='name')return a.name.localeCompare(b.name);
+    if(sortBy==='total_hrs')return b.totalHrs-a.totalHrs;
+    if(sortBy==='ot_hrs')return b.otHrs-a.otHrs;
+    if(sortBy==='nd_hrs')return b.ndHrs-a.ndHrs;
+    if(sortBy==='days')return b.daysWorked-a.daysWorked;
+    return a.name.localeCompare(b.name);
+  });
+  document.getElementById('analytics-sub').textContent=`${emps.length} employee${emps.length!==1?'s':''} · click to view detailed breakdown`;
+
+  if(gridView==='grid'){
+    document.getElementById('emp-grid').innerHTML=emps.map(emp=>renderEmpCard(emp)).join('');
+    document.getElementById('emp-grid').style.display='grid';
+    document.getElementById('emp-list-view').style.display='none';
+  } else {
+    renderEmpList(emps);
+    document.getElementById('emp-grid').style.display='none';
+    document.getElementById('emp-list-view').style.display='block';
+  }
+}
+
+function renderEmpCard(emp){
+  const initials=emp.name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+  // Get first month's week data for mini bars
+  const months=Object.entries(emp.monthly);
+  const mData=months.length>0?months[0][1]:null;
+  const weekHrs=mData?['w1','w2','w3','w4'].map(w=>mData[w].h):[0,0,0,0];
+  const maxWk=Math.max(...weekHrs,0.1);
+  const barColors=['#E8EAF6','#EEF4FE','#E8F5EE','#FFF3E0'];
+  const barActColors=['var(--indigo)','var(--blue)','var(--green)','#BF360C'];
+  const miniBars=weekHrs.map((h,i)=>`
+    <div class="ec-week-bar-col">
+      <div class="ec-week-bar" style="height:${Math.max(h/maxWk*28,2)}px;background:${h>0?barActColors[i]:barColors[i]}"></div>
+      <span class="ec-week-label">W${i+1}</span>
+    </div>`).join('');
+  const otColor=emp.otHrs>0?'var(--blue)':'var(--muted)';
+  const ndColor=emp.ndHrs>0?'var(--purple)':'var(--muted)';
+  return`<div class="emp-card" onclick="openDetail('${emp.id}')">
+    <div class="ec-header">
+      <div class="ec-avatar">${initials}</div>
+      <div><div class="ec-name">${emp.name}</div><div class="ec-id">#${emp.id}</div></div>
+    </div>
+    <div class="ec-stats">
+      <div class="ec-stat"><span class="ec-val">${emp.totalHrs}h</span><span class="ec-lbl">Total Hrs</span></div>
+      <div class="ec-stat"><span class="ec-val">${emp.daysWorked}</span><span class="ec-lbl">Days</span></div>
+      <div class="ec-stat"><span class="ec-val">${emp.avgDailyHrs}h</span><span class="ec-lbl">Avg/Day</span></div>
+    </div>
+    <div class="ec-badges">
+      ${emp.otHrs>0?`<span class="badge b-ot">OT ${emp.otHrs}h</span>`:''}
+      ${emp.ndHrs>0?`<span class="badge b-nd">ND ${emp.ndHrs}h</span>`:''}
+      ${emp.overnightDays>0?`<span class="badge b-night">🌙 ${emp.overnightDays}x</span>`:''}
+      ${emp.daysWorked===0?`<span class="badge b-warn">No Records</span>`:''}
+    </div>
+    <div class="ec-week-bars">${miniBars}</div>
+  </div>`;
+}
+
+function renderEmpList(emps){
+  const tbody=document.getElementById('emp-list-tbody');
+  tbody.innerHTML=emps.map(emp=>{
+    const months=Object.entries(emp.monthly);
+    const mData=months.length>0?months[0][1]:null;
+    const whs=mData?['w1','w2','w3','w4'].map(w=>mData[w].h):[0,0,0,0];
+    return`<tr style="cursor:pointer" onclick="openDetail('${emp.id}')">
+      <td class="td-id">${emp.id}</td>
+      <td style="font-weight:500">${emp.name}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.daysWorked}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;font-weight:600">${emp.totalHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.regularHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;color:var(--blue)">${emp.otHrs>0?emp.otHrs+'h':'–'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace;color:var(--purple)">${emp.ndHrs>0?emp.ndHrs+'h':'–'}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.avgDailyHrs}h</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.otDays}</td>
+      <td style="text-align:center;font-family:'DM Mono',monospace">${emp.overnightDays>0?emp.overnightDays:'–'}</td>
+      ${whs.map((h,i)=>`<td style="text-align:center;font-family:'DM Mono',monospace;font-size:11px">${h>0?h+'h':'–'}</td>`).join('')}
+    </tr>`;
+  }).join('');
+}
+
+function filterGrid(){renderGrid()}
+function setView(v){
+  gridView=v;
+  document.getElementById('view-grid').classList.toggle('active',v==='grid');
+  document.getElementById('view-list').classList.toggle('active',v==='list');
+  renderGrid();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EMPLOYEE DETAIL
+// ══════════════════════════════════════════════════════════════════
+function openDetail(empId){
+  const emp=employeeMap[empId];
+  if(!emp)return;
+  document.getElementById('emp-grid-view').style.display='none';
+  document.getElementById('emp-detail').style.display='block';
+
+  // Avatar + header
+  const initials=emp.name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+  document.getElementById('d-avatar').textContent=initials;
+  document.getElementById('d-name').textContent=emp.name;
+  document.getElementById('d-meta').innerHTML=`
+    <span>#${emp.id}</span>
+    <span>${emp.daysWorked} days worked</span>
+    <span>${emp.totalPunches} biometric taps</span>
+    <span>Cutoff: ${allSummaryRows.find(r=>r.employee_id===empId)?.cutoff_label||'—'}</span>`;
+
+  // KPIs
+  document.getElementById('d-kpi').innerHTML=`
+    <div class="kpi-card"><div class="kv">${emp.totalHrs}h</div><div class="kl">Total Hours</div></div>
+    <div class="kpi-card kpi-blue"><div class="kv">${emp.daysWorked}</div><div class="kl">Days Worked</div></div>
+    <div class="kpi-card kpi-green"><div class="kv">${emp.avgDailyHrs}h</div><div class="kl">Avg Per Day</div></div>
+    <div class="kpi-card kpi-blue"><div class="kv">${emp.otHrs}h</div><div class="kl">OT Hours (${emp.otRatePct}%)</div></div>
+    <div class="kpi-card kpi-purple"><div class="kv">${emp.ndHrs}h</div><div class="kl">Night Diff (${emp.ndRatePct}%)</div></div>
+    <div class="kpi-card kpi-gold"><div class="kv">${emp.maxDailyHrs}h</div><div class="kl">Peak Day</div></div>`;
+
+  // Breakdown table
+  const months=Object.entries(emp.monthly).sort((a,b)=>a[0].localeCompare(b[0]));
+  let breakdown=`<table class="breakdown"><thead><tr>
+    <th>Month</th>
+    <th class="w1-col">W1 (1–7)</th><th class="w2-col">W2 (8–14)</th>
+    <th class="w3-col">W3 (15–21)</th><th class="w4-col">W4 (22+)</th>
+    <th>Total</th><th>Days</th>
+  </tr></thead><tbody>`;
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-');
+    const mn=new Date(+y,+m-1,1).toLocaleString('default',{month:'long'});
+    const fmt=v=>v>0?`${v}h`:'–';
+    breakdown+=`<tr>
+      <td>${mn} ${y}</td>
+      <td class="w1-col">${fmt(M.w1.h)}${M.w1.o>0?`<br><small style="color:var(--blue)">+OT ${M.w1.o}h</small>`:''}</td>
+      <td class="w2-col">${fmt(M.w2.h)}${M.w2.o>0?`<br><small style="color:var(--blue)">+OT ${M.w2.o}h</small>`:''}</td>
+      <td class="w3-col">${fmt(M.w3.h)}${M.w3.o>0?`<br><small style="color:var(--blue)">+OT ${M.w3.o}h</small>`:''}</td>
+      <td class="w4-col">${fmt(M.w4.h)}${M.w4.o>0?`<br><small style="color:var(--blue)">+OT ${M.w4.o}h</small>`:''}</td>
+      <td><strong>${M.total.h}h</strong></td><td>${M.total.d}</td>
+    </tr>`;
+  });
+  breakdown+=`</tbody><tfoot><tr>
+    <td>TOTAL</td>
+    <td class="w1-col">${r2(months.reduce((s,[,M])=>s+M.w1.h,0))}h</td>
+    <td class="w2-col">${r2(months.reduce((s,[,M])=>s+M.w2.h,0))}h</td>
+    <td class="w3-col">${r2(months.reduce((s,[,M])=>s+M.w3.h,0))}h</td>
+    <td class="w4-col">${r2(months.reduce((s,[,M])=>s+M.w4.h,0))}h</td>
+    <td><strong>${emp.totalHrs}h</strong></td><td>${emp.daysWorked}</td>
+  </tr></tfoot></table>`;
+  document.getElementById('d-breakdown').innerHTML=breakdown;
+
+  // Bar chart — render only when clicked
+  document.getElementById('d-chart').innerHTML=`
+    <div style="text-align:center;padding:40px 20px;background:var(--cream);border-radius:8px;cursor:pointer" onclick="expandBarChart('${empId}')">
+      <div style="font-size:28px;margin-bottom:8px">📊</div>
+      <div style="font-size:13px;color:var(--muted)">Click to view weekly hours chart</div>
+    </div>`;
+
+  // Calendar
+  let calHtml='';
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-').map(Number);
+    const mn=new Date(y,m-1,1).toLocaleString('default',{month:'long'});
+    calHtml+=`<div class="cal-month-label">${mn} ${y}</div>${drawCalendar(emp,y,m)}`;
+  });
+  document.getElementById('d-calendar').innerHTML=calHtml;
+
+  // Daily table
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const sorted=[...emp.rows].sort((a,b)=>dateCompare(a.work_date,b.work_date));
+  const maxH=Math.max(...sorted.map(r=>r.total_hrs),1);
+  document.getElementById('d-daily-tbody').innerHTML=sorted.map(row=>{
+    const[mm,dd,yyyy]=row.work_date.split('/').map(Number);
+    const dayName=days[new Date(yyyy,mm-1,dd).getDay()];
+    const wk=weekOfMonth(dd);
+    const wkColors=['var(--indigo)','var(--blue)','var(--green)','#BF360C'];
+    const barW=Math.round(row.regular_hrs/maxH*80);
+    const otBarW=Math.round(row.ot_hrs/maxH*80);
+    const flags=[];
+    if(row.is_overnight)flags.push('<span class="badge b-night" style="font-size:10px">🌙</span>');
+    if(row.ot_hrs>0)flags.push(`<span class="badge b-ot" style="font-size:10px">OT</span>`);
+    if(row.nd_hrs>0)flags.push(`<span class="badge b-nd" style="font-size:10px">ND</span>`);
+    if(row.needs_review)flags.push('<span class="badge b-warn" style="font-size:10px">⚠</span>');
+    return`<tr>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${row.work_date}</td>
+      <td style="font-size:11px;color:var(--muted)">${dayName}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${row.time_in}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${row.time_out}</td>
+      <td><div class="hrs-bar-wrap"><div class="hrs-bar" style="width:${barW}px"></div><span style="font-family:'DM Mono',monospace;font-size:12px">${row.total_hrs}h</span></div></td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${row.regular_hrs}h</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--blue)">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--purple)">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:10px;color:${wkColors[wk-1]};font-weight:600">W${wk}</span></td>
+      <td>${flags.join(' ')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function expandBarChart(empId){
+  const emp=employeeMap[empId];
+  if(!emp)return;
+  const el=document.getElementById('d-chart');
+  el.innerHTML=drawBarChart(emp);
+}
+
+function closeDetail(){
+  document.getElementById('emp-detail').style.display='none';
+  document.getElementById('emp-grid-view').style.display='block';
+}
+
+// ── BAR CHART SVG ──────────────────────────────────────────────
+function drawBarChart(emp){
+  const months=Object.entries(emp.monthly).sort((a,b)=>a[0].localeCompare(b[0]));
+  const bars=[];
+  months.forEach(([ym,M])=>{
+    const[y,m]=ym.split('-').map(Number);
+    const shortMo=new Date(y,m-1,1).toLocaleString('default',{month:'short'});
+    ['w1','w2','w3','w4'].forEach((wk,wi)=>{
+      const d=M[wk];
+      bars.push({label:`W${wi+1}`,sub:`${shortMo}'${String(y).slice(2)}`,
+        reg:d.r,ot:d.o,nd:d.n,total:d.h,days:d.d,weekNum:wi+1});
+    });
+  });
+
+  const maxH=Math.max(...bars.map(b=>b.total),8);
+  const W=560, H=140, PAD_L=36, PAD_B=32, barW=Math.floor((W-PAD_L)/Math.max(bars.length,1)*0.7);
+  const barGap=Math.floor((W-PAD_L)/Math.max(bars.length,1));
+  const scale=v=>(v/maxH)*H;
+
+  // Y-axis guides
+  const yGuides=[0,maxH*0.25,maxH*0.5,maxH*0.75,maxH].map(v=>r2(v));
+  let yLines=yGuides.map(v=>{
+    const y=H-scale(v);
+    return`<line x1="${PAD_L}" y1="${y}" x2="${W}" y2="${y}" stroke="#F0EAD6" stroke-width="1"/>
+    <text x="${PAD_L-4}" y="${y+4}" text-anchor="end" font-size="9" fill="#9E9E9E" font-family="monospace">${Math.round(v)}h</text>`;
+  }).join('');
+
+  let svgBars=bars.map((b,i)=>{
+    const x=PAD_L+(i*barGap)+(barGap-barW)/2;
+    const rH=scale(b.reg), oH=scale(b.ot), nH=scale(b.nd);
+    const rY=H-rH, oY=rY-oH, nY=oY-nH;
+    const topY=b.total>0?Math.min(rY,oY,nY):H;
+    const wColors=['#3949AB','#1565C0','#1A7A4A','#BF360C'];
+    const barCol=wColors[b.weekNum-1];
+    return`
+      ${b.reg>0?`<rect x="${x}" y="${rY}" width="${barW}" height="${rH}" fill="${barCol}" rx="2" opacity="0.7"/>`:''}
+      ${b.ot>0?`<rect x="${x}" y="${oY}" width="${barW}" height="${oH}" fill="var(--blue)" rx="2"/>`:''}
+      ${b.nd>0?`<rect x="${x}" y="${nY}" width="${barW}" height="${nH}" fill="var(--purple)" rx="2"/>`:''}
+      ${b.days===0?`<rect x="${x}" y="${H-4}" width="${barW}" height="4" fill="#E0E0E0" rx="2"/>`:''}
+      ${b.total>0?`<text x="${x+barW/2}" y="${topY-4}" text-anchor="middle" font-size="8.5" fill="#555" font-family="monospace" font-weight="600">${b.total}h</text>`:''}
+      <text x="${x+barW/2}" y="${H+14}" text-anchor="middle" font-size="9" fill="#9E9E9E" font-family="monospace">${b.label}</text>
+      <text x="${x+barW/2}" y="${H+24}" text-anchor="middle" font-size="8" fill="#BDBDBD" font-family="monospace">${b.sub}</text>`;
+  }).join('');
+
+  return`<svg width="100%" viewBox="0 0 ${W} ${H+PAD_B+4}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="${PAD_L}" y1="0" x2="${PAD_L}" y2="${H}" stroke="#E0E0E0" stroke-width="1"/>
+    <line x1="${PAD_L}" y1="${H}" x2="${W}" y2="${H}" stroke="#E0E0E0" stroke-width="1"/>
+    ${yLines}${svgBars}
+  </svg>`;
+}
+
+// ── CALENDAR HEATMAP ──────────────────────────────────────────
+function drawCalendar(emp,year,month){
+  const daysInMonth=new Date(year,month,0).getDate();
+  const firstDay=new Date(year,month-1,1).getDay();
+  const dayLookup={};
+  emp.rows.forEach(r=>{
+    const[mm,dd,yyyy]=r.work_date.split('/').map(Number);
+    if(yyyy===year&&mm===month)dayLookup[dd]=r;
+  });
+
+  const dayHeaders=['S','M','T','W','T','F','S'].map(d=>`<div class="cal-day-header">${d}</div>`).join('');
+  let cells=Array(firstDay).fill('<div class="cal-cell empty"></div>').join('');
+
+  for(let d=1;d<=daysInMonth;d++){
+    const row=dayLookup[d];
+    let bg='#EEEEEE', textColor='#999';
+    if(row){
+      textColor='white';
+      if(row.is_overnight)bg='#E65100';
+      else if(row.nd_hrs>0)bg=`var(--purple)`;
+      else if(row.ot_hrs>0)bg=`var(--blue)`;
+      else if(row.total_hrs>=8)bg=`var(--green)`;
+      else if(row.total_hrs>0)bg=`#81C784`;
+    }
+    const title=row?`${row.total_hrs}h worked (${row.time_in}–${row.time_out})`:d;
+    const hrsLabel=row&&row.total_hrs>0?`<span class="ch" style="color:${textColor};opacity:.85">${row.total_hrs}h</span>`:'';
+    cells+=`<div class="cal-cell" style="background:${bg}" title="${title}">
+      <span class="cn" style="color:${textColor}">${d}</span>${hrsLabel}
+    </div>`;
+  }
+  return`<div class="cal-grid" style="margin-bottom:16px">${dayHeaders}${cells}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SAVE REMINDER BANNER
+// ══════════════════════════════════════════════════════════════════
+function showSaveBanner(){document.getElementById('save-banner').classList.add('show')}
+function hideSaveBanner(){document.getElementById('save-banner').classList.remove('show')}
+
+// ══════════════════════════════════════════════════════════════════
+// CONFIRM RENDER
+// ══════════════════════════════════════════════════════════════════
+function renderConfirm() {
+  const emps = Object.keys(employeeMap).length;
+  const monthlyCount = Object.values(employeeMap).reduce((s,e) => s + Object.keys(e.monthly).length, 0);
+  const weeklyCount  = Object.values(employeeMap).reduce((s,e) => s + e.weekly.length, 0);
+  document.getElementById('confirm-grid').innerHTML = `
+    <div class="cg-item"><div class="cg-label">Day Records</div><div class="cg-value">${allSummaryRows.length}</div></div>
+    <div class="cg-item"><div class="cg-label">Employees</div><div class="cg-value">${emps}</div></div>
+    <div class="cg-item"><div class="cg-label">OT Records</div><div class="cg-value">${allSummaryRows.filter(r=>r.ot_hrs>0).length}</div></div>
+    <div class="cg-item"><div class="cg-label">Raw Punches</div><div class="cg-value">${rawPunches.length}</div></div>
+    <div class="cg-item"><div class="cg-label">Monthly Rows</div><div class="cg-value">${monthlyCount}</div></div>
+    <div class="cg-item"><div class="cg-label">Weekly Rows</div><div class="cg-value">${weeklyCount}</div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// API — direct to Apps Script, no Content-Type header (no CORS preflight)
+// ══════════════════════════════════════════════════════════════════
+async function testConn() {
+  const btn=document.getElementById('test-btn');
+  const connEl=document.getElementById('conn-status');
+  const msgEl=document.getElementById('conn-msg');
+  btn.disabled=true; btn.textContent='Testing…';
+  connEl.style.display='flex'; connEl.className='alert alert-info';
+  msgEl.textContent='Pinging Apps Script…';
+  try {
+    const resp=await fetch(GAS_URL+'?action=ping&t='+Date.now());
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(data.status==='ok'){
+      connEl.className='alert alert-info';
+      const sheets=data.sheets?` · Sheets: ${data.sheets.join(', ')}`:' ';
+      msgEl.innerHTML='✓ Connected!'+sheets;
+    }else{
+      connEl.className='alert alert-warn';
+      msgEl.textContent='✗ '+(data.error||'Unexpected response');
+    }
+  }catch(err){connEl.className='alert alert-warn';msgEl.textContent='✗ '+err.message;}
+  finally{btn.disabled=false;btn.textContent='🔌 Test Connection';}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// WRITE TO GOOGLE SHEETS — single batch request
+// ══════════════════════════════════════════════════════════════════
+async function writeToSheets() {
+  const btn=document.getElementById('confirm-btn');
+  const bar=document.getElementById('prog-bar');
+  const fill=document.getElementById('prog-fill');
+  const msg=document.getElementById('status-msg');
+  btn.disabled=true; btn.textContent='Saving…'; bar.classList.add('active');
+  const now=new Date().toISOString();
+  const cutoff=allSummaryRows[0]?.cutoff_label||'';
+
+  // Build all 4 datasets
+  const rawRows=rawPunches.map(r=>[r.employee_id,r.employee_name,r.punch_date,r.punch_time,getCutoffLabel(r.punch_date),sourceFile,now]);
+  const dailyRows=allSummaryRows.map(r=>[r.employee_id,r.employee_name,r.work_date,r.time_in,r.time_out,r.total_hrs,r.regular_hrs,r.ot_hrs,r.nd_hrs,r.is_overnight?'TRUE':'FALSE',r.punch_count,r.cutoff_label,r.source_file,now]);
+  const mrows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    Object.entries(emp.monthly).forEach(([ym,M])=>{
+      mrows.push([emp.id,emp.name,ym,M.w1.h,M.w1.r,M.w1.o,M.w1.n,M.w1.d,M.w2.h,M.w2.r,M.w2.o,M.w2.n,M.w2.d,M.w3.h,M.w3.r,M.w3.o,M.w3.n,M.w3.d,M.w4.h,M.w4.r,M.w4.o,M.w4.n,M.w4.d,M.total.h,M.total.r,M.total.o,M.total.n,M.total.d,emp.avgDailyHrs,emp.otRatePct,emp.ndRatePct,emp.maxDailyHrs,emp.minDailyHrs,emp.overnightDays,emp.totalPunches,cutoff,now]);
+    });
+  });
+  const wrows=[];
+  Object.values(employeeMap).forEach(emp=>{
+    emp.weekly.forEach(w=>{wrows.push([emp.id,emp.name,w.yearMonth,w.weekNum,w.weekLabel,w.hrs,w.regHrs,w.otHrs,w.ndHrs,w.days,w.avgDailyHrs,w.dateFrom,w.dateTo,w.cutoffLabel,now]);});
+  });
+
+  msg.textContent='Sending all data in one request…'; fill.style.width='30%';
+
+  try {
+    // Single batch POST — 1 request instead of 4
+    const resp=await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({
+        action:'write_all',
+        sheets:{
+          '03_RawPunches':rawRows,
+          '04_DailySummary':dailyRows,
+          '05_EmployeeMonthly':mrows,
+          '06_EmployeeWeekly':wrows
+        }
+      })
+    });
+    fill.style.width='90%';
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(data.status!=='ok')throw new Error(data.error||'Unknown error');
+    fill.style.width='100%';
+    msg.textContent='✓ Done! '+rawRows.length+' punches · '+dailyRows.length+' daily · '+mrows.length+' monthly · '+wrows.length+' weekly rows saved.';
+    msg.className='status-msg ok';
+    hideSaveBanner();
+    document.getElementById('done-msg').textContent=dailyRows.length+' daily records and '+mrows.length+' monthly analytics saved for cutoff '+cutoff+'.';
+    setTimeout(()=>goTo(5),1200);
+  }catch(err){
+    fill.style.width='0%';
+    msg.textContent='Error: '+err.message;
+    msg.className='status-msg err';
+    btn.disabled=false; btn.textContent='✓ Save to Google Sheets';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ARCHIVE SYSTEM
+// ══════════════════════════════════════════════════════════════════
+let archiveData={daily:[],monthly:[],weekly:[]};
+let archiveView='employees'; // 'employees' | 'periods'
+let archiveSelected=null;
+let archiveLoaded=false;
+
+function openArchive(){
+  document.getElementById('archive-overlay').classList.add('open');
+  if(!archiveLoaded)refreshArchive();
+}
+function closeArchive(){document.getElementById('archive-overlay').classList.remove('open');}
+
+async function refreshArchive(){
+  const statusEl=document.getElementById('arch-conn-status');
+  const listEl=document.getElementById('archive-list');
+  statusEl.textContent='Loading from Sheets…';
+  listEl.innerHTML='<div class="archive-loading">Connecting to Google Sheets…</div>';
+
+  // If we have locally parsed data from this session, offer it immediately
+  if(allSummaryRows.length>0&&!archiveLoaded){
+    archiveData.daily=allSummaryRows.map(r=>({
+      employee_id:r.employee_id, employee_name:r.employee_name,
+      work_date:r.work_date, time_in:r.time_in, time_out:r.time_out,
+      total_hrs:r.total_hrs, regular_hrs:r.regular_hrs,
+      ot_hrs:r.ot_hrs, nd_hrs:r.nd_hrs,
+      is_overnight:r.is_overnight?'TRUE':'FALSE',
+      punch_count:r.punch_count, cutoff_label:r.cutoff_label
+    }));
+    archiveData.monthly=[];
+    archiveData.weekly=[];
+    Object.values(employeeMap).forEach(emp=>{
+      Object.entries(emp.monthly).forEach(([ym,M])=>{
+        archiveData.monthly.push({employee_id:emp.id,employee_name:emp.name,year_month:ym,
+          w1_hrs:M.w1.h,w1_reg:M.w1.r,w1_ot:M.w1.o,w1_nd:M.w1.n,w1_days:M.w1.d,
+          w2_hrs:M.w2.h,w2_reg:M.w2.r,w2_ot:M.w2.o,w2_nd:M.w2.n,w2_days:M.w2.d,
+          w3_hrs:M.w3.h,w3_reg:M.w3.r,w3_ot:M.w3.o,w3_nd:M.w3.n,w3_days:M.w3.d,
+          w4_hrs:M.w4.h,w4_reg:M.w4.r,w4_ot:M.w4.o,w4_nd:M.w4.n,w4_days:M.w4.d,
+          total_hrs:M.total.h,total_ot_hrs:M.total.o,total_nd_hrs:M.total.n,
+          days_worked:M.total.d,cutoff_label:allSummaryRows[0]?.cutoff_label||''
+        });
+      });
+    });
+  }
+
+  try{
+    const resp=await fetch(GAS_URL+'?action=read_all&t='+Date.now());
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+
+    // Old Apps Script deployment won't have read_all — detect and guide user
+    if(data.status!=='ok'){
+      throw new Error(data.error||'Apps Script returned an error');
+    }
+
+    // Check if it's the old script (no daily_summary key)
+    if(!data.hasOwnProperty('daily_summary')){
+      throw new Error('Apps Script needs to be updated — paste the new AppsScript_Code.gs and redeploy');
+    }
+
+    const fromSheets={
+      daily:data.daily_summary||[],
+      monthly:data.employee_monthly||[],
+      weekly:data.employee_weekly||[]
+    };
+
+    // Merge: prefer Sheets data, supplement with local session data
+    if(fromSheets.daily.length>0){
+      archiveData=fromSheets;
+    }
+    // else keep local data
+
+    archiveLoaded=true;
+    const src=fromSheets.daily.length>0?'Google Sheets':'current session (not yet saved)';
+    statusEl.textContent=archiveData.daily.length+' records from '+src;
+    renderArchiveSidebar();
+
+  }catch(err){
+    console.error('Archive load error:',err);
+    if(archiveData.daily.length>0){
+      // Show local data with warning
+      archiveLoaded=true;
+      statusEl.textContent='⚠ Sheets unavailable — showing current session only';
+      listEl.innerHTML='';
+      document.getElementById('archive-main').innerHTML=`
+        <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:14px 18px;margin-bottom:16px;font-size:13px;color:#5D4037">
+          <strong>⚠ Could not load from Google Sheets:</strong> ${err.message}<br><br>
+          Showing data from this session only. To fix:<br>
+          1. Paste the latest <strong>AppsScript_Code.gs</strong> into your Apps Script editor<br>
+          2. Create a <strong>new deployment</strong> (not update existing)<br>
+          3. Click 🔄 Refresh
+        </div>`;
+      renderArchiveSidebar();
+    }else{
+      statusEl.textContent='✗ Failed to load';
+      listEl.innerHTML=`<div class="archive-loading" style="color:var(--red);text-align:left;padding:16px">
+        <strong>Could not connect to Google Sheets</strong><br><br>
+        ${err.message}<br><br>
+        <strong>Fix:</strong> Paste the new AppsScript_Code.gs into your Apps Script, create a new deployment, and click 🔄 Refresh.
+      </div>`;
+    }
+  }
+}
+
+function setArchiveView(view, el){
+  archiveView=view;
+  document.querySelectorAll('.asb-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  archiveSelected=null;
+  renderArchiveSidebar();
+  document.getElementById('archive-main').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;gap:12px"><div style="font-size:40px">👈</div><div style="font-size:14px;color:var(--muted)">Select ${view==='employees'?'an employee':'a pay period'} from the sidebar</div></div>`;
+}
+
+function renderArchiveSidebar(){
+  const el=document.getElementById('archive-list');
+  if(!archiveLoaded){el.innerHTML='<div class="archive-loading">Loading…</div>';return;}
+
+  if(archiveView==='employees'){
+    // Build unique employee list from daily data
+    const empMap={};
+    archiveData.daily.forEach(r=>{
+      const id=String(r.employee_id);
+      if(!empMap[id]){empMap[id]={id,name:String(r.employee_name),days:0,cutoffs:new Set()};}
+      empMap[id].days++;
+      empMap[id].cutoffs.add(String(r.cutoff_label));
+    });
+    const emps=Object.values(empMap).sort((a,b)=>a.name.localeCompare(b.name));
+    if(!emps.length){el.innerHTML='<div class="archive-loading">No employee data in Sheets yet.</div>';return;}
+    el.innerHTML=emps.map(e=>`
+      <div class="archive-item${archiveSelected===e.id?' active':''}" onclick="selectArchiveEmployee('${e.id}')">
+        <div>
+          <div class="archive-item-name">${e.name}</div>
+          <div class="archive-item-sub">#${e.id} · ${e.days} days · ${e.cutoffs.size} cutoffs</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">›</div>
+      </div>`).join('');
+  }else{
+    // Build unique cutoff periods
+    const periods={};
+    archiveData.daily.forEach(r=>{
+      const c=String(r.cutoff_label);
+      if(!periods[c]){periods[c]={label:c,emps:new Set(),days:0};}
+      periods[c].emps.add(String(r.employee_id));
+      periods[c].days++;
+    });
+    const sorted=Object.values(periods).sort((a,b)=>a.label.localeCompare(b.label));
+    if(!sorted.length){el.innerHTML='<div class="archive-loading">No period data in Sheets yet.</div>';return;}
+    el.innerHTML=sorted.map(p=>`
+      <div class="archive-item${archiveSelected===p.label?' active':''}" onclick="selectArchivePeriod(this.dataset.cutoff)" data-cutoff="${p.label.replace(/"/g,'&quot;')}">
+        <div>
+          <div class="archive-item-name">${p.label}</div>
+          <div class="archive-item-sub">${p.emps.size} employees · ${p.days} day records</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">›</div>
+      </div>`).join('');
+  }
+}
+
+// ── EMPLOYEE DETAIL ──────────────────────────────────────────────
+function selectArchiveEmployee(empId){
+  archiveSelected=empId;
+  renderArchiveSidebar();
+  const daily=archiveData.daily.filter(r=>String(r.employee_id)===empId);
+  const monthly=archiveData.monthly.filter(r=>String(r.employee_id)===empId);
+  const weekly=archiveData.weekly.filter(r=>String(r.employee_id)===empId);
+  const name=daily.length?String(daily[0].employee_name):'Employee '+empId;
+
+  // KPIs
+  const totalHrs=r2(daily.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0));
+  const totalOT=r2(daily.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
+  const totalND=r2(daily.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
+  const cutoffs=[...new Set(daily.map(r=>String(r.cutoff_label)))];
+  const avgDay=daily.length?r2(totalHrs/daily.length):0;
+
+  // Group daily by cutoff
+  const byCutoff={};
+  daily.forEach(r=>{
+    const c=String(r.cutoff_label);
+    if(!byCutoff[c])byCutoff[c]=[];
+    byCutoff[c].push(r);
+  });
+
+  // Get monthly data grouped by year_month
+  const byMonth={};
+  monthly.forEach(r=>{const k=String(r.year_month);if(!byMonth[k])byMonth[k]=r;});
+
+  const initials=name.split(' ').filter(Boolean).map(n=>n[0].toUpperCase()).slice(0,2).join('');
+
+  let html=`
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--blue));color:white;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:18px;flex-shrink:0">${initials}</div>
+      <div>
+        <h3 style="margin-bottom:2px">${name}</h3>
+        <div class="subtitle">ID #${empId} · ${daily.length} days worked · ${cutoffs.length} pay period${cutoffs.length!==1?'s':''} on record</div>
+      </div>
+    </div>
+    <div class="arch-kpi-row">
+      <div class="arch-kpi"><div class="kv">${totalHrs}h</div><div class="kl">Total Hours</div></div>
+      <div class="arch-kpi blue"><div class="kv">${daily.length}</div><div class="kl">Days Worked</div></div>
+      <div class="arch-kpi"><div class="kv">${avgDay}h</div><div class="kl">Avg Per Day</div></div>
+      <div class="arch-kpi green"><div class="kv">${totalOT}h</div><div class="kl">OT Hours</div></div>
+      <div class="arch-kpi purple"><div class="kv">${totalND}h</div><div class="kl">Night Diff</div></div>
+    </div>`;
+
+  // Monthly week breakdown if available
+  if(Object.keys(byMonth).length>0){
+    html+=`<div style="margin-bottom:20px">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">Monthly Breakdown · W1=days 1–7, W2=8–14, W3=15–21, W4=22+</div>
+      ${Object.entries(byMonth).sort((a,b)=>a[0].localeCompare(b[0])).map(([ym,M])=>{
+        const w1h=parseFloat(M.w1_hrs)||0,w2h=parseFloat(M.w2_hrs)||0,w3h=parseFloat(M.w3_hrs)||0,w4h=parseFloat(M.w4_hrs)||0;
+        const totH=parseFloat(M.total_hrs)||0,totOT=parseFloat(M.total_ot_hrs)||0,totND=parseFloat(M.total_nd_hrs)||0;
+        const [yr,mo]=ym.split('-').map(Number);
+        const mName=new Date(yr,mo-1,1).toLocaleString('default',{month:'long'});
+        return `<div style="background:white;border:1px solid var(--rule);border-radius:10px;margin-bottom:10px;overflow:hidden">
+          <div style="padding:11px 16px;background:var(--sand);display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:15px;color:var(--navy)">${mName} ${yr}</div>
+            <div style="font-size:12px;font-family:'DM Mono',monospace;color:var(--muted)">${totH}h total · OT ${totOT}h · ND ${totND}h</div>
+          </div>
+          <div class="week-grid" style="padding:12px">
+            <div class="week-cell wk1"><div class="wc-label">Week 1 (1–7)</div><div class="wc-hrs">${w1h}h</div><div class="wc-sub">OT ${parseFloat(M.w1_ot)||0}h · ND ${parseFloat(M.w1_nd)||0}h · ${parseInt(M.w1_days)||0} days</div></div>
+            <div class="week-cell wk2"><div class="wc-label">Week 2 (8–14)</div><div class="wc-hrs">${w2h}h</div><div class="wc-sub">OT ${parseFloat(M.w2_ot)||0}h · ND ${parseFloat(M.w2_nd)||0}h · ${parseInt(M.w2_days)||0} days</div></div>
+            <div class="week-cell wk3"><div class="wc-label">Week 3 (15–21)</div><div class="wc-hrs">${w3h}h</div><div class="wc-sub">OT ${parseFloat(M.w3_ot)||0}h · ND ${parseFloat(M.w3_nd)||0}h · ${parseInt(M.w3_days)||0} days</div></div>
+            <div class="week-cell wk4"><div class="wc-label">Week 4 (22+)</div><div class="wc-hrs">${w4h}h</div><div class="wc-sub">OT ${parseFloat(M.w4_ot)||0}h · ND ${parseFloat(M.w4_nd)||0}h · ${parseInt(M.w4_days)||0} days</div></div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Cutoff-by-cutoff daily table
+  html+=`<div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:12px">Daily Records by Pay Period</div>
+    <div class="cutoff-cards">`;
+
+  Object.entries(byCutoff).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([cutoff,rows])=>{
+    const totH=r2(rows.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0));
+    const totOT=r2(rows.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
+    const totND=r2(rows.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
+    const cid='cc-'+cutoff.replace(/[|\s]/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
+    html+=`<div class="cutoff-card-ar">
+      <div class="cc-hd" onclick="toggleCutoff('${cid}')">
+        <h4>${cutoff}</h4>
+        <div class="cc-meta">${rows.length} days · ${totH}h total · OT ${totOT}h · ND ${totND}h</div>
+        <div style="font-size:14px;color:var(--muted);margin-left:8px" id="${cid}-icon">▾</div>
+      </div>
+      <div class="cc-body" id="${cid}">
+        <table class="arch-tbl">
+          <thead><tr>
+            <th>Date</th><th>Day</th><th>Time In</th><th>Time Out</th>
+            <th class="num">Total</th><th class="num">Regular</th>
+            <th class="num">OT</th><th class="num">Night Diff</th>
+            <th>Punches</th><th>Flags</th>
+          </tr></thead>
+          <tbody>
+            ${rows.sort((a,b)=>String(a.work_date).localeCompare(String(b.work_date))).map(r=>{
+              const flags=[];
+              if(String(r.is_overnight)==='TRUE')flags.push('<span class="arch-badge ab-night">🌙</span>');
+              if(parseFloat(r.ot_hrs)>0)flags.push(`<span class="arch-badge ab-ot">OT</span>`);
+              if(parseFloat(r.nd_hrs)>0)flags.push(`<span class="arch-badge ab-nd">ND</span>`);
+              return `<tr>
+                <td style="font-family:'DM Mono',monospace;font-size:11px">${cleanDate(r.work_date)}</td>
+                <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${cleanTime(r.time_in)}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${cleanTime(r.time_out)}</td>
+                <td class="num">${r.total_hrs}h</td>
+                <td class="num">${r.regular_hrs}h</td>
+                <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
+                <td class="num" style="color:var(--purple)">${parseFloat(r.nd_hrs)>0?r.nd_hrs+'h':'–'}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${r.punch_count}</td>
+                <td>${flags.join(' ')}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:var(--sand);font-weight:700">
+              <td colspan="4" style="font-size:12px;padding:8px 12px">CUTOFF TOTAL</td>
+              <td class="num">${totH}h</td>
+              <td class="num">${r2(rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+              <td class="num" style="color:var(--blue)">${totOT}h</td>
+              <td class="num" style="color:var(--purple)">${totND}h</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+
+  html+='</div>';
+  document.getElementById('archive-main').innerHTML=html;
+}
+
+// ── PERIOD DETAIL ────────────────────────────────────────────────
+function selectArchivePeriod(cutoff){
+  archiveSelected=cutoff;
+  renderArchiveSidebar();
+  const daily=archiveData.daily.filter(r=>String(r.cutoff_label)===cutoff);
+  const monthly=archiveData.monthly.filter(r=>String(r.cutoff_label)===cutoff);
+
+  // Group by employee
+  const empMap={};
+  daily.forEach(r=>{
+    const id=String(r.employee_id);
+    if(!empMap[id]){empMap[id]={id,name:String(r.employee_name),days:0,totalHrs:0,otHrs:0,ndHrs:0,rows:[]};}
+    empMap[id].days++;
+    empMap[id].totalHrs+=parseFloat(r.total_hrs)||0;
+    empMap[id].otHrs+=parseFloat(r.ot_hrs)||0;
+    empMap[id].ndHrs+=parseFloat(r.nd_hrs)||0;
+    empMap[id].rows.push(r);
+  });
+  const emps=Object.values(empMap).sort((a,b)=>a.name.localeCompare(b.name));
+  emps.forEach(e=>{e.totalHrs=r2(e.totalHrs);e.otHrs=r2(e.otHrs);e.ndHrs=r2(e.ndHrs);});
+
+  const grandHrs=r2(emps.reduce((s,e)=>s+e.totalHrs,0));
+  const grandOT=r2(emps.reduce((s,e)=>s+e.otHrs,0));
+  const grandND=r2(emps.reduce((s,e)=>s+e.ndHrs,0));
+
+  let html=`
+    <h3>${cutoff}</h3>
+    <div class="subtitle">${emps.length} employees · ${daily.length} day records · ${grandHrs}h total</div>
+    <div class="arch-kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="arch-kpi blue"><div class="kv">${emps.length}</div><div class="kl">Employees</div></div>
+      <div class="arch-kpi"><div class="kv">${grandHrs}h</div><div class="kl">Total Hours</div></div>
+      <div class="arch-kpi green"><div class="kv">${grandOT}h</div><div class="kl">Total OT</div></div>
+      <div class="arch-kpi purple"><div class="kv">${grandND}h</div><div class="kl">Total Night Diff</div></div>
+    </div>
+
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px">All Employees This Period</div>
+    <div style="background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden;margin-bottom:20px">
+      <table class="arch-tbl">
+        <thead><tr>
+          <th>Employee</th><th class="num">Days</th>
+          <th class="num">Total Hrs</th><th class="num">Regular</th>
+          <th class="num">OT Hrs</th><th class="num">Night Diff</th>
+          <th class="num">Avg/Day</th>
+        </tr></thead>
+        <tbody>
+          ${emps.map(e=>`<tr onclick="setArchiveView('employees',document.getElementById('asb-emp'));selectArchiveEmployee('${e.id}')" style="cursor:pointer">
+            <td><div style="font-weight:500">${e.name}</div><div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--muted)">#${e.id}</div></td>
+            <td class="num">${e.days}</td>
+            <td class="num" style="font-weight:600">${e.totalHrs}h</td>
+            <td class="num">${r2(e.rows.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+            <td class="num" style="color:var(--blue)">${e.otHrs>0?e.otHrs+'h':'–'}</td>
+            <td class="num" style="color:var(--purple)">${e.ndHrs>0?e.ndHrs+'h':'–'}</td>
+            <td class="num" style="color:var(--muted)">${e.days>0?r2(e.totalHrs/e.days)+'h':'–'}</td>
+          </tr>`).join('')}
+          <tr style="background:var(--sand);font-weight:700">
+            <td style="padding:9px 12px">PERIOD TOTAL</td>
+            <td class="num">${daily.length}</td>
+            <td class="num">${grandHrs}h</td>
+            <td class="num">${r2(daily.reduce((s,r)=>s+(parseFloat(r.regular_hrs)||0),0))}h</td>
+            <td class="num" style="color:var(--blue)">${grandOT}h</td>
+            <td class="num" style="color:var(--purple)">${grandND}h</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:-12px;margin-bottom:16px">Click any employee row to view their full history ↗</div>`;
+
+  document.getElementById('archive-main').innerHTML=html;
+}
+
+function toggleCutoff(id){
+  const body=document.getElementById(id);
+  const icon=document.getElementById(id+'-icon');
+  const collapsed=body.classList.toggle('collapsed');
+  if(icon)icon.textContent=collapsed?'▸':'▾';
+}
+
+
+// Strips time component from date strings coming back from Sheets
+// "2026-03-08 15:00:00" → "2026-03-08"  |  "03/08/2026" → "03/08/2026"
+function cleanDate(val){
+  if(!val)return '';
+  const s=String(val).trim();
+  // YYYY-MM-DD (possibly with time)
+  const iso=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if(iso)return iso[1];
+  // MM/DD/YYYY
+  const slash=s.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+  if(slash)return slash[1];
+  return s;
+}
+
+// Returns "HH:mm" from a value — strips date prefix if present
+function cleanTime(val){
+  if(!val)return '—';
+  const s=String(val).trim();
+  // Already HH:mm or HH:mm:ss
+  const t=s.match(/(\d{1,2}:\d{2})/);
+  if(t)return t[1];
+  return s;
+}
+function getDayName(dateStr){
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  if(!dateStr)return '';
+  try{
+    // Strip time portion if present: "2026-03-08 15:00:00" → "2026-03-08"
+    const clean=String(dateStr).split(' ')[0].split('T')[0];
+    const p=clean.split(/[-/]/);
+    if(p.length<3)return '';
+    // Handle both YYYY-MM-DD and MM/DD/YYYY
+    let y,m,d;
+    if(clean.includes('-')&&p[0].length===4){y=+p[0];m=+p[1]-1;d=+p[2];}
+    else{m=+p[0]-1;d=+p[1];y=+p[2];}
+    return days[new Date(y,m,d,12).getDay()];
+  }catch(e){return '';}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// OVERRIDE goTo to show save banner when leaving analytics step
+// ══════════════════════════════════════════════════════════════════
+const _origGoTo=goTo;
+
+// ══════════════════════════════════════════════════════════════════
+// MISC
+// ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// PUNCH EDITOR
+// ══════════════════════════════════════════════════════════════════
+let punchEditorState = null; // { empId, workDate, punches, overrideIn, overrideOut }
+
+function openPunchModal(empId, workDate) {
+  const row = allSummaryRows.find(r => r.employee_id === empId && r.work_date === workDate);
+  if (!row) return;
+
+  punchEditorState = {
+    empId,
+    workDate,
+    empName: row.employee_name,
+    // Deep copy punches with ignored/assigned flags
+    punches: row.all_punches.map((t, i) => ({
+      time: t,
+      origIdx: i,
+      ignored: false,
+      reassignDate: workDate
+    })),
+    overrideIn: null,
+    overrideOut: null
+  };
+
+  document.getElementById('pm-title').textContent = 'Edit Punches — ' + row.employee_name;
+  document.getElementById('pm-subtitle').textContent = workDate + ' · ' + row.punch_count + ' punches recorded';
+  document.getElementById('pm-new-date').value = workDate.split('/').reverse().join('-').replace(/^(\d+)-(\d+)-(\d+)$/, '$1-$2-$3');
+
+  // Set override times from current in/out
+  const toHHMM = t => t ? t.substring(0, 5) : '';
+  document.getElementById('pm-override-in').value = toHHMM(row.time_in);
+  document.getElementById('pm-override-out').value = toHHMM(row.time_out);
+
+  renderPunchModal();
+  document.getElementById('punch-modal').classList.add('open');
+}
+
+function closePunchModal() {
+  document.getElementById('punch-modal').classList.remove('open');
+  punchEditorState = null;
+}
+
+function renderPunchModal() {
+  if (!punchEditorState) return;
+  const { punches, overrideIn, overrideOut, workDate } = punchEditorState;
+
+  // Sort punches by time for display
+  const sorted = [...punches].filter(p => p.reassignDate === workDate && !p.ignored)
+                              .sort((a,b) => a.time.localeCompare(b.time));
+
+  // Compute effective in/out
+  let effIn = overrideIn || (sorted.length > 0 ? sorted[0].time : '—');
+  let effOut = overrideOut || (sorted.length > 0 ? sorted[sorted.length-1].time : '—');
+
+  const tMins = t => { if(!t||t==='—')return 0; const[h,m]=t.split(':').map(Number);return h*60+m; };
+  const inM = tMins(effIn), outM = tMins(effOut);
+  let rawHrs = outM > inM ? (outM - inM) / 60 : (1440 - inM + outM) / 60;
+  let adjHrs = rawHrs >= 4 ? rawHrs - 1 : rawHrs; // subtract break
+  let regHrs = Math.min(adjHrs, 8), otHrs = Math.max(adjHrs - 8, 0);
+
+  document.getElementById('pm-computed').innerHTML = `
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Time In</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--green)">${effIn}</div>${overrideIn?'<div style="font-size:10px;color:var(--blue)">✎ overridden</div>':''}</div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Time Out</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:#E65100">${effOut}</div>${overrideOut?'<div style="font-size:10px;color:var(--blue)">✎ overridden</div>':''}</div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Total (after break)</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700">${adjHrs.toFixed(2)}h</div></div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Regular / OT</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700">${regHrs.toFixed(2)}h / <span style="color:var(--blue)">${otHrs.toFixed(2)}h</span></div></div>
+    ${overrideIn||overrideOut?'<div style="font-size:11px;color:var(--blue);align-self:center">Using overridden times</div>':''}
+  `;
+
+  // Render punch list
+  const allVisible = punches.sort((a,b)=>a.time.localeCompare(b.time));
+  const activeForDay = allVisible.filter(p=>!p.ignored&&p.reassignDate===workDate);
+  document.getElementById('pm-punch-list').innerHTML = allVisible.map((p, i) => {
+    const isFirst = !p.ignored && p.reassignDate===workDate && p===activeForDay[0];
+    const isLast  = !p.ignored && p.reassignDate===workDate && activeForDay.length>1 && p===activeForDay[activeForDay.length-1];
+    const roleClass = isFirst ? 'first-punch' : isLast ? 'last-punch' : '';
+    const roleBadge = isFirst ? '<span class="punch-role-badge role-in">⏵ TIME IN</span>'
+                    : isLast  ? '<span class="punch-role-badge role-out">⏹ TIME OUT</span>'
+                    : '<span class="punch-role-badge role-mid">intermediate</span>';
+    const isNight = p.time.substring(0,2) >= '22' || p.time.substring(0,2) < '06';
+
+    return `<div class="punch-row-edit ${roleClass} ${p.ignored?'ignored':''}" id="prow-${i}">
+      <div class="punch-time-badge" style="color:${isNight?'var(--purple)':'var(--text)'}">${p.time.substring(0,5)}</div>
+      ${roleBadge}
+      ${isNight?'<span style="font-size:10px;color:var(--purple);font-family:monospace">🌙 night</span>':''}
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:11px;color:var(--muted)">Assign to:</div>
+        <input type="date" value="${toDateInput(p.reassignDate)}" style="font-size:11px;min-height:30px;padding:3px 8px"
+          onchange="punchEditorState.punches[${i}].reassignDate=fromDateInput(this.value);renderPunchModal()">
+        <button onclick="punchEditorState.punches[${i}].ignored=!punchEditorState.punches[${i}].ignored;renderPunchModal()"
+          class="btn btn-ghost" style="font-size:10px;padding:4px 10px;min-height:30px;color:${p.ignored?'var(--green)':'var(--red)'}">
+          ${p.ignored?'↩ Restore':'✕ Ignore'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toDateInput(dateStr) {
+  // MM/DD/YYYY → YYYY-MM-DD
+  if (!dateStr) return '';
+  const p = dateStr.split('/');
+  if (p.length === 3) return p[2]+'-'+p[0].padStart(2,'0')+'-'+p[1].padStart(2,'0');
+  return dateStr;
+}
+function fromDateInput(dateStr) {
+  // YYYY-MM-DD → MM/DD/YYYY
+  if (!dateStr) return '';
+  const p = dateStr.split('-');
+  if (p.length === 3) return p[1]+'/'+p[2]+'/'+p[0];
+  return dateStr;
+}
+
+function addManualPunch() {
+  const timeVal = document.getElementById('pm-new-time').value;
+  const dateVal = document.getElementById('pm-new-date').value;
+  if (!timeVal) { alert('Enter a time for the punch'); return; }
+  const assignDate = dateVal ? fromDateInput(dateVal) : punchEditorState.workDate;
+  punchEditorState.punches.push({
+    time: timeVal+':00',
+    origIdx: -1,
+    ignored: false,
+    reassignDate: assignDate,
+    manual: true
+  });
+  document.getElementById('pm-new-time').value = '';
+  renderPunchModal();
+}
+
+function applyOverride() {
+  const inVal  = document.getElementById('pm-override-in').value;
+  const outVal = document.getElementById('pm-override-out').value;
+  if (!inVal || !outVal) { alert('Set both Time In and Time Out'); return; }
+  punchEditorState.overrideIn  = inVal + ':00';
+  punchEditorState.overrideOut = outVal + ':00';
+  renderPunchModal();
+}
+
+function applyPunchEdits() {
+  if (!punchEditorState) return;
+  const { empId, workDate, punches, overrideIn, overrideOut } = punchEditorState;
+
+  // Find the row in allSummaryRows
+  const rowIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === workDate);
+  if (rowIdx === -1) { closePunchModal(); return; }
+
+  // Rebuild effective punches for this date
+  const activePunches = punches
+    .filter(p => !p.ignored && p.reassignDate === workDate)
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  const tMins = t => { if(!t)return 0; const[h,m]=t.substring(0,5).split(':').map(Number);return h*60+m; };
+
+  let timeIn, timeOut;
+  if (overrideIn && overrideOut) {
+    timeIn  = overrideIn.substring(0,5);
+    timeOut = overrideOut.substring(0,5);
+  } else if (activePunches.length > 0) {
+    timeIn  = activePunches[0].time.substring(0,5);
+    timeOut = activePunches[activePunches.length-1].time.substring(0,5);
+  } else {
+    alert('No valid punches remain for this day. Ignoring all punches means no hours to compute.');
+    return;
+  }
+
+  const inM = tMins(timeIn), outM = tMins(timeOut);
+  const overnight = outM < inM && (inM > 20*60);
+  const rawMins = overnight ? (1440 - inM + outM) : (outM - inM);
+  const adjMins = rawMins >= 240 ? rawMins - 60 : rawMins;
+  const totalHrs = r2(Math.max(adjMins / 60, 0));
+  const regHrs   = r2(Math.min(totalHrs, 8));
+  const otHrs    = r2(Math.max(totalHrs - 8, 0));
+  const ndHrs    = r2(calcND(inM, outM, overnight));
+
+  // Update the row
+  const row = allSummaryRows[rowIdx];
+  row.time_in     = timeIn;
+  row.time_out    = timeOut;
+  row.total_hrs   = totalHrs;
+  row.regular_hrs = regHrs;
+  row.ot_hrs      = otHrs;
+  row.nd_hrs      = ndHrs;
+  row.is_overnight= overnight;
+  row.punch_count = activePunches.length;
+  row.needs_review= activePunches.length <= 1 || (overrideIn && overrideOut);
+  row.all_punches = activePunches.map(p => p.time.substring(0,5));
+  row.manually_edited = true;
+
+  // Handle punches reassigned to other dates
+  const reassigned = punches.filter(p => !p.ignored && p.reassignDate !== workDate);
+  reassigned.forEach(p => {
+    // Find if a row exists for that date
+    const targetIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === p.reassignDate);
+    if (targetIdx >= 0) {
+      // Add punch to that row and recompute
+      allSummaryRows[targetIdx].all_punches.push(p.time.substring(0,5));
+      allSummaryRows[targetIdx].all_punches.sort();
+      // Trigger recompute on next render
+      allSummaryRows[targetIdx]._needsRecompute = true;
+    }
+  });
+
+  // Rebuild analytics from scratch since hours changed
+  buildAnalytics();
+
+  closePunchModal();
+  renderPreview();
+  renderGrid();
+
+  // Show success toast
+  showToast('✓ Punches updated — ' + timeIn + ' → ' + timeOut + ' (' + totalHrs + 'h)');
+}
+
+function showToast(msg) {
+  let t = document.getElementById('ph-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'ph-toast';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 3000);
+}
+
+function showUploadSection(){
+  document.getElementById('upload-section').style.display='block';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// OVERNIGHT TAIL HANDLER
+// ══════════════════════════════════════════════════════════════════
+let overnightTailState = null;
+
+function openOvernightTailModal(empId, workDate) {
+  const tailRow = allSummaryRows.find(r => r.employee_id === empId && r.work_date === workDate);
+  if (!tailRow) return;
+
+  // Find the previous day's row for this employee
+  const sorted = allSummaryRows
+    .filter(r => r.employee_id === empId)
+    .sort((a,b) => dateCompare(a.work_date, b.work_date));
+  const tailIdx = sorted.findIndex(r => r.work_date === workDate);
+  const prevRow = tailIdx > 0 ? sorted[tailIdx - 1] : null;
+
+  overnightTailState = { empId, workDate, tailRow, prevRow, fix: prevRow ? 'merge' : 'standalone' };
+
+  document.getElementById('ont-subtitle').textContent =
+    tailRow.employee_name + ' · ' + workDate + ' · Single punch at ' + tailRow.time_in;
+
+  // Current state cards
+  document.getElementById('ont-current').innerHTML = `
+    <div style="background:var(--cream);border:1px solid var(--rule);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">This punch (${workDate})</div>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:#E65100">${tailRow.time_in}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Single punch · ${tailRow.total_hrs}h computed (likely wrong)</div>
+    </div>
+    ${prevRow ? `<div style="background:var(--cream);border:1px solid var(--rule);border-radius:8px;padding:12px">
+      <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px">Previous day (${prevRow.work_date})</div>
+      <div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--green)">${prevRow.time_in} <span style="color:var(--muted);font-size:14px">→</span> <span style="color:#E65100">${prevRow.time_out}</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${prevRow.total_hrs}h · ${prevRow.punch_count} punches</div>
+    </div>` : '<div style="background:#FFF3E0;border:1px dashed #FFB74D;border-radius:8px;padding:12px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#E65100">No previous day found for this employee</div>'}
+  `;
+
+  // Fix options
+  const opts = document.getElementById('ont-options');
+  opts.innerHTML = '';
+
+  if (prevRow) {
+    opts.innerHTML += `
+      <label style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:2px solid var(--blue);border-radius:8px;background:var(--lt-blue);cursor:pointer">
+        <input type="radio" name="ont-fix" value="merge" checked style="margin-top:2px;flex-shrink:0">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--navy)">Use as Time Out for ${prevRow.work_date}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">
+            Sets ${prevRow.work_date} OUT to <strong>${tailRow.time_in}</strong> → 
+            new shift = <strong>${prevRow.time_in} → ${tailRow.time_in}</strong> (overnight) · 
+            removes the ${workDate} row
+          </div>
+        </div>
+      </label>
+      <label style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--rule);border-radius:8px;cursor:pointer">
+        <input type="radio" name="ont-fix" value="standalone" style="margin-top:2px;flex-shrink:0">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--navy)">Keep as standalone punch on ${workDate}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">Mark this row as reviewed and leave it. Use the manual editor to set hours if needed.</div>
+        </div>
+      </label>`;
+    // Add custom time-out option
+    opts.innerHTML += `
+      <label style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1px solid var(--rule);border-radius:8px;cursor:pointer">
+        <input type="radio" name="ont-fix" value="custom" style="margin-top:2px;flex-shrink:0">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px;color:var(--navy)">Merge with custom time — override both IN and OUT</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;margin-bottom:8px">Use this if the time needs adjusting.</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Time In (shift start)</div>
+              <input type="time" id="ont-custom-in" value="${prevRow.time_in.substring(0,5)}" style="min-height:32px;font-size:12px"></div>
+            <div style="font-size:16px;color:var(--muted);margin-top:18px">→</div>
+            <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Time Out (next day)</div>
+              <input type="time" id="ont-custom-out" value="${tailRow.time_in.substring(0,5)}" style="min-height:32px;font-size:12px"></div>
+          </div>
+        </div>
+      </label>`;
+  } else {
+    opts.innerHTML = `
+      <label style="display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:2px solid var(--rule);border-radius:8px;cursor:pointer">
+        <input type="radio" name="ont-fix" value="standalone" checked style="margin-top:2px;flex-shrink:0">
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--navy)">Mark as reviewed</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px">No previous day found. Open the full punch editor to set hours manually.</div>
+        </div>
+      </label>`;
+  }
+
+  // Listen for radio changes to update the apply button state
+  setTimeout(() => {
+    document.querySelectorAll('input[name="ont-fix"]').forEach(r => {
+      r.addEventListener('change', () => {
+        overnightTailState.fix = r.value;
+      });
+    });
+  }, 50);
+
+  document.getElementById('overnight-modal').classList.add('open');
+}
+
+function closeOvernightModal() {
+  document.getElementById('overnight-modal').classList.remove('open');
+  overnightTailState = null;
+}
+
+function applyOvernightFix() {
+  if (!overnightTailState) return;
+  const { empId, workDate, tailRow, prevRow } = overnightTailState;
+  const fix = document.querySelector('input[name="ont-fix"]:checked')?.value || 'standalone';
+
+  if (fix === 'standalone') {
+    // Just mark as reviewed — clear the overnight_tail flag
+    const r = allSummaryRows.find(r => r.employee_id === empId && r.work_date === workDate);
+    if (r) { r.is_overnight_tail = false; r.needs_review = false; r.manually_edited = true; }
+
+  } else if ((fix === 'merge' || fix === 'custom') && prevRow) {
+    const timeIn  = fix === 'custom'
+      ? (document.getElementById('ont-custom-in').value  || prevRow.time_in.substring(0,5))
+      : prevRow.time_in.substring(0,5);
+    const timeOut = fix === 'custom'
+      ? (document.getElementById('ont-custom-out').value || tailRow.time_in.substring(0,5))
+      : tailRow.time_in.substring(0,5);
+
+    const inM = t2m(timeIn), outM = t2m(timeOut);
+    const overnight = outM < inM; // crosses midnight — yes, this is an overnight shift
+    const rawMins = overnight ? (1440 - inM + outM) : (outM - inM);
+    const adjMins = rawMins >= 240 ? rawMins - 60 : rawMins;
+    const totalHrs = r2(Math.max(adjMins / 60, 0));
+
+    // Update the previous day's row to use the new times
+    const prevIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === prevRow.work_date);
+    if (prevIdx >= 0) {
+      const pr = allSummaryRows[prevIdx];
+      pr.time_in      = timeIn;
+      pr.time_out     = timeOut;
+      pr.total_hrs    = totalHrs;
+      pr.regular_hrs  = r2(Math.min(totalHrs, 8));
+      pr.ot_hrs       = r2(Math.max(totalHrs - 8, 0));
+      pr.nd_hrs       = r2(calcND(inM, outM, overnight));
+      pr.is_overnight = overnight;
+      pr.needs_review = false;
+      pr.manually_edited = true;
+      // Add the tail punch to the previous row's punch list
+      pr.all_punches  = [...pr.all_punches, timeOut].sort();
+      pr.punch_count  = pr.all_punches.length;
+    }
+
+    // Remove the tail row (it no longer represents a shift)
+    const tailIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === workDate);
+    if (tailIdx >= 0) allSummaryRows.splice(tailIdx, 1);
+  }
+
+  // Rebuild
+  activeRows = [...allSummaryRows];
+  buildAnalytics();
+  closeOvernightModal();
+  renderPreview();
+  renderGrid();
+  showToast('✓ Overnight shift fixed — ' + (prevRow?.work_date || workDate) + ' updated');
+}
+
+function openSettings(){}
+function closeSettings(){}
+function saveSettings(){}
+
+function resetAll(){
+  rawPunches=[];summaryRows=[];allSummaryRows=[];activeRows=[];employeeMap={};sourceFile='';
+  hideSaveBanner();
+  document.getElementById('fi').value='';
+  document.getElementById('up-err').innerHTML='';
+  goTo(1);
+}
+</script>
+
+<!-- ═══ PUNCH EDITOR MODAL ═══ -->
+<div class="modal-overlay" id="punch-modal" onclick="if(event.target===this)closePunchModal()">
+  <div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy)" id="pm-title">Edit Punches</h3>
+      <button class="btn btn-ghost" onclick="closePunchModal()" style="padding:6px 12px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px" id="pm-subtitle"></p>
+
+    <!-- Current computed result -->
+    <div id="pm-computed" style="background:var(--lt-blue);border:1px solid #90CAF9;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:flex;gap:20px;flex-wrap:wrap">
+    </div>
+
+    <!-- Punch list -->
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px">All Raw Punches for This Day</div>
+    <div id="pm-punch-list" style="margin-bottom:16px"></div>
+
+    <!-- Add manual punch -->
+    <div style="border:1px dashed var(--rule);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Add Manual Punch</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time</div>
+          <input type="time" id="pm-new-time" style="min-height:36px;font-size:13px;font-weight:600">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Assign to date</div>
+          <input type="date" id="pm-new-date" style="min-height:36px;font-size:13px">
+        </div>
+        <div style="align-self:flex-end">
+          <button class="btn btn-primary" onclick="addManualPunch()" style="padding:9px 18px">+ Add Punch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Override time in/out -->
+    <div style="border:1px solid var(--rule);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Override Time In / Time Out</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Use this when the biometrics missed a punch — set the correct times directly.</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time In</div>
+          <input type="time" id="pm-override-in" style="min-height:36px;font-size:13px;color:var(--green);font-weight:600">
+        </div>
+        <div style="font-size:16px;color:var(--muted);align-self:flex-end;margin-bottom:8px">→</div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time Out</div>
+          <input type="time" id="pm-override-out" style="min-height:36px;font-size:13px;color:#E65100;font-weight:600">
+        </div>
+        <div style="align-self:flex-end">
+          <button class="btn btn-blue" onclick="applyOverride()" style="padding:9px 18px">Apply Override</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closePunchModal()">Cancel</button>
+      <button class="btn btn-confirm" onclick="applyPunchEdits()" style="padding:9px 24px">✓ Apply Changes</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ OVERNIGHT TAIL MODAL ═══ -->
+<div class="modal-overlay" id="overnight-modal" onclick="if(event.target===this)closeOvernightModal()">
+  <div class="modal" style="max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy)">🌙 Overnight Tail Punch</h3>
+      <button class="btn btn-ghost" onclick="closeOvernightModal()" style="padding:6px 12px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px" id="ont-subtitle"></p>
+
+    <!-- Explanation -->
+    <div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:#E65100;line-height:1.7">
+      <strong>What is an overnight tail?</strong><br>
+      This punch looks like a shift that started the <em>previous day</em> and crossed midnight. 
+      For example: shift starts 03/14 at 22:00, ends 03/15 at 00:44. 
+      The 03/15 punch is the TIME OUT for the 03/14 shift, not a new shift.
+    </div>
+
+    <!-- Current state -->
+    <div id="ont-current" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px"></div>
+
+    <!-- What to do -->
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:10px">How to fix it</div>
+
+    <div id="ont-options" style="display:flex;flex-direction:column;gap:8px;margin-bottom:18px"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeOvernightModal()">Cancel</button>
+      <button class="btn btn-confirm" id="ont-apply-btn" onclick="applyOvernightFix()" style="padding:9px 24px">✓ Apply Fix</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>    <h2>Save to Google Sheets</h2>
     <p>This writes all parsed data directly into your Google Sheets backend — permanently. Each cutoff you process adds new rows without overwriting existing ones.</p>
 
     <div class="confirm-grid" id="confirm-grid"></div>
