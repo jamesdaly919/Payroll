@@ -290,7 +290,7 @@ table.daily-detail tbody tr:last-child td{border-bottom:none}
 
 /* ── CUTOFF CARD ── */
 .cutoff-cards{display:flex;flex-direction:column;gap:12px}
-.cutoff-card-ar{background:white;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.cutoff-card-ar{background:white;border:1px solid var(--rule);border-radius:12px}
 .cutoff-card-ar .cc-hd{padding:12px 16px;background:var(--sand);display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
 .cutoff-card-ar .cc-hd h4{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:var(--navy)}
 .cutoff-card-ar .cc-hd .cc-meta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace}
@@ -2509,7 +2509,15 @@ function archToggleExpand(key, dateTd) {
     </div>
   </td>`;
 
-  parentTr.after(expandTr);
+  // Insert above or below depending on available space
+  const rect = parentTr.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  if (spaceBelow < 200) {
+    parentTr.before(expandTr);
+  } else {
+    parentTr.after(expandTr);
+  }
+  expandTr.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   if (arrow) { arrow.style.transform = 'rotate(180deg)'; arrow.style.color = 'var(--blue)'; }
 }
 
