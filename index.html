@@ -327,6 +327,19 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
   .week-grid{grid-template-columns:repeat(2,1fr)}
 }
 
+
+/* ── PUNCH EDITOR ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:14px;padding:28px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.punch-row-edit{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;margin-bottom:6px;border:1px solid var(--rule);flex-wrap:wrap;transition:all .15s}
+.punch-row-edit.ignored{opacity:.4;background:var(--sand);text-decoration:line-through}
+.punch-row-edit.first-punch{border-color:var(--green);background:#E8F5EE}
+.punch-row-edit.last-punch{border-color:#E65100;background:#FFF3E0}
+.punch-time-badge{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;min-width:56px}
+.punch-role-badge{font-size:10px;border-radius:4px;padding:2px 8px;font-family:'DM Mono',monospace;font-weight:600}
+.role-in{background:#E8F5EE;color:var(--green)}.role-out{background:#FFF3E0;color:#E65100}.role-mid{background:var(--sand);color:var(--muted)}
+
 </style>
 </head>
 <body>
@@ -361,7 +374,7 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
     <h2>📂 Payroll Archive</h2>
     <div id="arch-conn-status" style="font-size:12px;color:rgba(255,255,255,.5);font-family:'DM Mono',monospace">Loading…</div>
     <button class="btn-sm" onclick="refreshArchive()" style="margin-left:8px">🔄 Refresh</button>
-    <button class="btn-sm" onclick="closeArchive()" style="margin-left:4px">✕ Close</button>
+    <button class="btn-sm" onclick="closeArchive()" style="margin-left:4px;background:white;color:var(--navy);font-weight:600">← Back to Tool</button>
   </div>
   <div class="archive-body">
     <!-- Sidebar -->
@@ -388,10 +401,27 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
 
 <!-- ═══ PANEL 1: UPLOAD ═══ -->
 <div class="panel active" id="panel-1">
-  <div class="upload-hero">
-    <h2>Upload Biometrics File</h2>
-    <p>The tool will parse every punch, summarize attendance, and build per-employee analytics.</p>
+  <!-- Hero with two paths -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;margin-top:24px">
+    <!-- Path A: Upload new -->
+    <div style="background:white;border:2px solid var(--blue);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer" onclick="document.getElementById('upload-section').style.display='block';document.getElementById('main-choice').style.display='none'">
+      <div style="font-size:40px;margin-bottom:12px">📊</div>
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--navy);margin-bottom:6px">Process New Cutoff</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6">Upload a biometrics export, review attendance, fix mispunches, and save to Google Sheets</div>
+      <div style="margin-top:16px;background:var(--blue);color:white;border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;display:inline-block">Upload Biometrics →</div>
+    </div>
+    <!-- Path B: View archive -->
+    <div style="background:white;border:2px solid var(--rule);border-radius:14px;padding:28px 24px;text-align:center;cursor:pointer" onclick="openArchive()">
+      <div style="font-size:40px;margin-bottom:12px">📂</div>
+      <div style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--navy);margin-bottom:6px">View Payroll Archive</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.6">Browse historical attendance by employee or pay period — all data from Google Sheets</div>
+      <div style="margin-top:16px;background:var(--sand);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:9px 20px;font-size:13px;font-weight:600;display:inline-block">Open Archive →</div>
+    </div>
   </div>
+
+  <!-- Upload section (hidden until chosen) -->
+  <div id="main-choice" style="display:none"><!-- spacer --></div>
+  <div id="upload-section" style="display:none">
   <div class="cutoff-bar">
     <div class="cutoff-opt selected" id="co-a" onclick="selCutoff('A')">
       <div class="co-dot">📅</div>
@@ -413,6 +443,8 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
   </div>
   <div id="up-err"></div>
 </div>
+
+  </div><!-- /upload-section -->
 
 <!-- ═══ PANEL 2: PREVIEW ═══ -->
 <div class="panel" id="panel-2">
@@ -453,6 +485,7 @@ table.arch-tbl tbody tr:last-child td{border-bottom:none}
         <th onclick="sortTbl('nd_hrs')">ND</th>
         <th>Punches</th>
         <th>Flags</th>
+        <th></th>
       </tr></thead>
       <tbody id="prev-tbody"></tbody>
     </table>
@@ -886,10 +919,11 @@ function renderTable(rows){
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--muted)">No matching records</td></tr>`;return}
   tbody.innerHTML=rows.map((row,i)=>{
     const flags=[];
+    if(row.manually_edited)flags.push('<span class="badge" style="background:#E8F5EE;color:var(--green)">✎ edited</span>');
     if(row.is_overnight)flags.push('<span class="badge b-night">🌙 Overnight</span>');
     if(row.ot_hrs>0)flags.push(`<span class="badge b-ot">OT ${row.ot_hrs}h</span>`);
     if(row.nd_hrs>0)flags.push(`<span class="badge b-nd">ND ${row.nd_hrs}h</span>`);
-    if(row.needs_review)flags.push('<span class="badge b-warn">⚠ Review</span>');
+    if(row.needs_review)flags.push(`<span class="badge b-warn" style="cursor:pointer" onclick="event.stopPropagation();openPunchModal('${row.employee_id}','${row.work_date}')">⚠ Review / Edit</span>`);
     const punchDetail=showPunches?`<tr class="punch-detail-row"><td colspan="11"><div class="punch-detail-inner">
       ${row.all_punches.map((t,pi)=>{let cls='';if(pi===0)cls='first';else if(pi===row.all_punches.length-1)cls='last';else if(t2m(t)>=22*60||t2m(t)<6*60)cls='night';const lbl=pi===0?'⏵ IN':pi===row.all_punches.length-1?'⏹ OUT':`[${pi}]`;return`<span class="punch-chip ${cls}">${lbl} ${t}</span>`}).join('')}
     </div></td></tr>`:'';
@@ -901,7 +935,7 @@ function renderTable(rows){
       <td class="td-hrs ot">${row.ot_hrs>0?row.ot_hrs+'h':'–'}</td>
       <td class="td-hrs nd">${row.nd_hrs>0?row.nd_hrs+'h':'–'}</td>
       <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted)">${row.punch_count}${row.punch_count===1?' ⚠':''}</td>
-      <td>${flags.join(' ')}</td></tr>${punchDetail}`;
+      <td>${flags.join(' ')}</td><td><button class='btn btn-ghost' style='font-size:10px;padding:3px 8px;min-height:26px' onclick="event.stopPropagation();openPunchModal('${row.employee_id}','${row.work_date}')">✎ Edit</button></td></tr>${punchDetail}`;
   }).join('');
 }
 
@@ -1426,7 +1460,7 @@ function renderArchiveSidebar(){
     const sorted=Object.values(periods).sort((a,b)=>a.label.localeCompare(b.label));
     if(!sorted.length){el.innerHTML='<div class="archive-loading">No period data in Sheets yet.</div>';return;}
     el.innerHTML=sorted.map(p=>`
-      <div class="archive-item${archiveSelected===p.label?' active':''}" onclick="selectArchivePeriod('${p.label}')">
+      <div class="archive-item${archiveSelected===p.label?' active':''}" onclick="selectArchivePeriod(this.dataset.cutoff)" data-cutoff="${p.label.replace(/"/g,'&quot;')}">
         <div>
           <div class="archive-item-name">${p.label}</div>
           <div class="archive-item-sub">${p.emps.size} employees · ${p.days} day records</div>
@@ -1658,6 +1692,231 @@ const _origGoTo=goTo;
 // ══════════════════════════════════════════════════════════════════
 // MISC
 // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+// PUNCH EDITOR
+// ══════════════════════════════════════════════════════════════════
+let punchEditorState = null; // { empId, workDate, punches, overrideIn, overrideOut }
+
+function openPunchModal(empId, workDate) {
+  const row = allSummaryRows.find(r => r.employee_id === empId && r.work_date === workDate);
+  if (!row) return;
+
+  punchEditorState = {
+    empId,
+    workDate,
+    empName: row.employee_name,
+    // Deep copy punches with ignored/assigned flags
+    punches: row.all_punches.map((t, i) => ({
+      time: t,
+      origIdx: i,
+      ignored: false,
+      reassignDate: workDate
+    })),
+    overrideIn: null,
+    overrideOut: null
+  };
+
+  document.getElementById('pm-title').textContent = 'Edit Punches — ' + row.employee_name;
+  document.getElementById('pm-subtitle').textContent = workDate + ' · ' + row.punch_count + ' punches recorded';
+  document.getElementById('pm-new-date').value = workDate.split('/').reverse().join('-').replace(/^(\d+)-(\d+)-(\d+)$/, '$1-$2-$3');
+
+  // Set override times from current in/out
+  const toHHMM = t => t ? t.substring(0, 5) : '';
+  document.getElementById('pm-override-in').value = toHHMM(row.time_in);
+  document.getElementById('pm-override-out').value = toHHMM(row.time_out);
+
+  renderPunchModal();
+  document.getElementById('punch-modal').classList.add('open');
+}
+
+function closePunchModal() {
+  document.getElementById('punch-modal').classList.remove('open');
+  punchEditorState = null;
+}
+
+function renderPunchModal() {
+  if (!punchEditorState) return;
+  const { punches, overrideIn, overrideOut, workDate } = punchEditorState;
+
+  // Sort punches by time for display
+  const sorted = [...punches].filter(p => p.reassignDate === workDate && !p.ignored)
+                              .sort((a,b) => a.time.localeCompare(b.time));
+
+  // Compute effective in/out
+  let effIn = overrideIn || (sorted.length > 0 ? sorted[0].time : '—');
+  let effOut = overrideOut || (sorted.length > 0 ? sorted[sorted.length-1].time : '—');
+
+  const tMins = t => { if(!t||t==='—')return 0; const[h,m]=t.split(':').map(Number);return h*60+m; };
+  const inM = tMins(effIn), outM = tMins(effOut);
+  let rawHrs = outM > inM ? (outM - inM) / 60 : (1440 - inM + outM) / 60;
+  let adjHrs = rawHrs >= 4 ? rawHrs - 1 : rawHrs; // subtract break
+  let regHrs = Math.min(adjHrs, 8), otHrs = Math.max(adjHrs - 8, 0);
+
+  document.getElementById('pm-computed').innerHTML = `
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Time In</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--green)">${effIn}</div>${overrideIn?'<div style="font-size:10px;color:var(--blue)">✎ overridden</div>':''}</div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Time Out</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:#E65100">${effOut}</div>${overrideOut?'<div style="font-size:10px;color:var(--blue)">✎ overridden</div>':''}</div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Total (after break)</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700">${adjHrs.toFixed(2)}h</div></div>
+    <div><div style="font-size:10px;color:var(--blue);font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Regular / OT</div><div style="font-family:'Syne',sans-serif;font-size:18px;font-weight:700">${regHrs.toFixed(2)}h / <span style="color:var(--blue)">${otHrs.toFixed(2)}h</span></div></div>
+    ${overrideIn||overrideOut?'<div style="font-size:11px;color:var(--blue);align-self:center">Using overridden times</div>':''}
+  `;
+
+  // Render punch list
+  const allVisible = punches.sort((a,b)=>a.time.localeCompare(b.time));
+  const activeForDay = allVisible.filter(p=>!p.ignored&&p.reassignDate===workDate);
+  document.getElementById('pm-punch-list').innerHTML = allVisible.map((p, i) => {
+    const isFirst = !p.ignored && p.reassignDate===workDate && p===activeForDay[0];
+    const isLast  = !p.ignored && p.reassignDate===workDate && activeForDay.length>1 && p===activeForDay[activeForDay.length-1];
+    const roleClass = isFirst ? 'first-punch' : isLast ? 'last-punch' : '';
+    const roleBadge = isFirst ? '<span class="punch-role-badge role-in">⏵ TIME IN</span>'
+                    : isLast  ? '<span class="punch-role-badge role-out">⏹ TIME OUT</span>'
+                    : '<span class="punch-role-badge role-mid">intermediate</span>';
+    const isNight = p.time.substring(0,2) >= '22' || p.time.substring(0,2) < '06';
+
+    return `<div class="punch-row-edit ${roleClass} ${p.ignored?'ignored':''}" id="prow-${i}">
+      <div class="punch-time-badge" style="color:${isNight?'var(--purple)':'var(--text)'}">${p.time.substring(0,5)}</div>
+      ${roleBadge}
+      ${isNight?'<span style="font-size:10px;color:var(--purple);font-family:'DM Mono',monospace">🌙 night</span>':''}
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:11px;color:var(--muted)">Assign to:</div>
+        <input type="date" value="${toDateInput(p.reassignDate)}" style="font-size:11px;min-height:30px;padding:3px 8px"
+          onchange="punchEditorState.punches[${i}].reassignDate=fromDateInput(this.value);renderPunchModal()">
+        <button onclick="punchEditorState.punches[${i}].ignored=!punchEditorState.punches[${i}].ignored;renderPunchModal()"
+          class="btn btn-ghost" style="font-size:10px;padding:4px 10px;min-height:30px;color:${p.ignored?'var(--green)':'var(--red)'}">
+          ${p.ignored?'↩ Restore':'✕ Ignore'}
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toDateInput(dateStr) {
+  // MM/DD/YYYY → YYYY-MM-DD
+  if (!dateStr) return '';
+  const p = dateStr.split('/');
+  if (p.length === 3) return p[2]+'-'+p[0].padStart(2,'0')+'-'+p[1].padStart(2,'0');
+  return dateStr;
+}
+function fromDateInput(dateStr) {
+  // YYYY-MM-DD → MM/DD/YYYY
+  if (!dateStr) return '';
+  const p = dateStr.split('-');
+  if (p.length === 3) return p[1]+'/'+p[2]+'/'+p[0];
+  return dateStr;
+}
+
+function addManualPunch() {
+  const timeVal = document.getElementById('pm-new-time').value;
+  const dateVal = document.getElementById('pm-new-date').value;
+  if (!timeVal) { alert('Enter a time for the punch'); return; }
+  const assignDate = dateVal ? fromDateInput(dateVal) : punchEditorState.workDate;
+  punchEditorState.punches.push({
+    time: timeVal+':00',
+    origIdx: -1,
+    ignored: false,
+    reassignDate: assignDate,
+    manual: true
+  });
+  document.getElementById('pm-new-time').value = '';
+  renderPunchModal();
+}
+
+function applyOverride() {
+  const inVal  = document.getElementById('pm-override-in').value;
+  const outVal = document.getElementById('pm-override-out').value;
+  if (!inVal || !outVal) { alert('Set both Time In and Time Out'); return; }
+  punchEditorState.overrideIn  = inVal + ':00';
+  punchEditorState.overrideOut = outVal + ':00';
+  renderPunchModal();
+}
+
+function applyPunchEdits() {
+  if (!punchEditorState) return;
+  const { empId, workDate, punches, overrideIn, overrideOut } = punchEditorState;
+
+  // Find the row in allSummaryRows
+  const rowIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === workDate);
+  if (rowIdx === -1) { closePunchModal(); return; }
+
+  // Rebuild effective punches for this date
+  const activePunches = punches
+    .filter(p => !p.ignored && p.reassignDate === workDate)
+    .sort((a,b) => a.time.localeCompare(b.time));
+
+  const tMins = t => { if(!t)return 0; const[h,m]=t.substring(0,5).split(':').map(Number);return h*60+m; };
+
+  let timeIn, timeOut;
+  if (overrideIn && overrideOut) {
+    timeIn  = overrideIn.substring(0,5);
+    timeOut = overrideOut.substring(0,5);
+  } else if (activePunches.length > 0) {
+    timeIn  = activePunches[0].time.substring(0,5);
+    timeOut = activePunches[activePunches.length-1].time.substring(0,5);
+  } else {
+    alert('No valid punches remain for this day. Ignoring all punches means no hours to compute.');
+    return;
+  }
+
+  const inM = tMins(timeIn), outM = tMins(timeOut);
+  const overnight = outM < inM && (inM > 20*60);
+  const rawMins = overnight ? (1440 - inM + outM) : (outM - inM);
+  const adjMins = rawMins >= 240 ? rawMins - 60 : rawMins;
+  const totalHrs = r2(Math.max(adjMins / 60, 0));
+  const regHrs   = r2(Math.min(totalHrs, 8));
+  const otHrs    = r2(Math.max(totalHrs - 8, 0));
+  const ndHrs    = r2(calcND(inM, outM, overnight));
+
+  // Update the row
+  const row = allSummaryRows[rowIdx];
+  row.time_in     = timeIn;
+  row.time_out    = timeOut;
+  row.total_hrs   = totalHrs;
+  row.regular_hrs = regHrs;
+  row.ot_hrs      = otHrs;
+  row.nd_hrs      = ndHrs;
+  row.is_overnight= overnight;
+  row.punch_count = activePunches.length;
+  row.needs_review= activePunches.length <= 1 || (overrideIn && overrideOut);
+  row.all_punches = activePunches.map(p => p.time.substring(0,5));
+  row.manually_edited = true;
+
+  // Handle punches reassigned to other dates
+  const reassigned = punches.filter(p => !p.ignored && p.reassignDate !== workDate);
+  reassigned.forEach(p => {
+    // Find if a row exists for that date
+    const targetIdx = allSummaryRows.findIndex(r => r.employee_id === empId && r.work_date === p.reassignDate);
+    if (targetIdx >= 0) {
+      // Add punch to that row and recompute
+      allSummaryRows[targetIdx].all_punches.push(p.time.substring(0,5));
+      allSummaryRows[targetIdx].all_punches.sort();
+      // Trigger recompute on next render
+      allSummaryRows[targetIdx]._needsRecompute = true;
+    }
+  });
+
+  // Rebuild analytics from scratch since hours changed
+  buildAnalytics();
+
+  closePunchModal();
+  renderPreview();
+  renderGrid();
+
+  // Show success toast
+  showToast('✓ Punches updated — ' + timeIn + ' → ' + timeOut + ' (' + totalHrs + 'h)');
+}
+
+function showToast(msg) {
+  let t = document.getElementById('ph-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'ph-toast';
+    t.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:white;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', 3000);
+}
+
 function openSettings(){}
 function closeSettings(){}
 function saveSettings(){}
@@ -1670,5 +1929,68 @@ function resetAll(){
   goTo(1);
 }
 </script>
+
+<!-- ═══ PUNCH EDITOR MODAL ═══ -->
+<div class="modal-overlay" id="punch-modal" onclick="if(event.target===this)closePunchModal()">
+  <div class="modal" style="max-width:700px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:var(--navy)" id="pm-title">Edit Punches</h3>
+      <button class="btn btn-ghost" onclick="closePunchModal()" style="padding:6px 12px">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:20px" id="pm-subtitle"></p>
+
+    <!-- Current computed result -->
+    <div id="pm-computed" style="background:var(--lt-blue);border:1px solid #90CAF9;border-radius:8px;padding:12px 16px;margin-bottom:18px;display:flex;gap:20px;flex-wrap:wrap">
+    </div>
+
+    <!-- Punch list -->
+    <div style="font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-bottom:8px">All Raw Punches for This Day</div>
+    <div id="pm-punch-list" style="margin-bottom:16px"></div>
+
+    <!-- Add manual punch -->
+    <div style="border:1px dashed var(--rule);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Add Manual Punch</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time</div>
+          <input type="time" id="pm-new-time" style="min-height:36px;font-size:13px;font-weight:600">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Assign to date</div>
+          <input type="date" id="pm-new-date" style="min-height:36px;font-size:13px">
+        </div>
+        <div style="align-self:flex-end">
+          <button class="btn btn-primary" onclick="addManualPunch()" style="padding:9px 18px">+ Add Punch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Override time in/out -->
+    <div style="border:1px solid var(--rule);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;text-transform:uppercase;letter-spacing:1px">Override Time In / Time Out</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Use this when the biometrics missed a punch — set the correct times directly.</div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time In</div>
+          <input type="time" id="pm-override-in" style="min-height:36px;font-size:13px;color:var(--green);font-weight:600">
+        </div>
+        <div style="font-size:16px;color:var(--muted);align-self:flex-end;margin-bottom:8px">→</div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Time Out</div>
+          <input type="time" id="pm-override-out" style="min-height:36px;font-size:13px;color:#E65100;font-weight:600">
+        </div>
+        <div style="align-self:flex-end">
+          <button class="btn btn-blue" onclick="applyOverride()" style="padding:9px 18px">Apply Override</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closePunchModal()">Cancel</button>
+      <button class="btn btn-confirm" onclick="applyPunchEdits()" style="padding:9px 24px">✓ Apply Changes</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
