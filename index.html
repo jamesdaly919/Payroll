@@ -1616,7 +1616,7 @@ function selectArchiveEmployee(empId){
     const totH=r2(rows.reduce((s,r)=>s+(parseFloat(r.total_hrs)||0),0));
     const totOT=r2(rows.reduce((s,r)=>s+(parseFloat(r.ot_hrs)||0),0));
     const totND=r2(rows.reduce((s,r)=>s+(parseFloat(r.nd_hrs)||0),0));
-    const cid='cc-'+cutoff.replace(/[|\s]/g,'_');
+    const cid='cc-'+cutoff.replace(/[|\s]/g,'_').replace(/[^a-zA-Z0-9_-]/g,'');
     html+=`<div class="cutoff-card-ar">
       <div class="cc-hd" onclick="toggleCutoff('${cid}')">
         <h4>${cutoff}</h4>
@@ -1638,10 +1638,10 @@ function selectArchiveEmployee(empId){
               if(parseFloat(r.ot_hrs)>0)flags.push(`<span class="arch-badge ab-ot">OT</span>`);
               if(parseFloat(r.nd_hrs)>0)flags.push(`<span class="arch-badge ab-nd">ND</span>`);
               return `<tr>
-                <td style="font-family:'DM Mono',monospace;font-size:11px">${r.work_date}</td>
-                <td style="font-size:11px;color:var(--muted)">${getDayName(String(r.work_date))}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${r.time_in||'—'}</td>
-                <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${r.time_out||'—'}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px">${cleanDate(r.work_date)}</td>
+                <td style="font-size:11px;color:var(--muted)">${getDayName(r.work_date)}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--green)">${cleanTime(r.time_in)}</td>
+                <td style="font-family:'DM Mono',monospace;font-size:11px;color:#E65100">${cleanTime(r.time_out)}</td>
                 <td class="num">${r.total_hrs}h</td>
                 <td class="num">${r.regular_hrs}h</td>
                 <td class="num" style="color:var(--blue)">${parseFloat(r.ot_hrs)>0?r.ot_hrs+'h':'–'}</td>
@@ -1746,9 +1746,44 @@ function toggleCutoff(id){
   if(icon)icon.textContent=collapsed?'▸':'▾';
 }
 
+
+// Strips time component from date strings coming back from Sheets
+// "2026-03-08 15:00:00" → "2026-03-08"  |  "03/08/2026" → "03/08/2026"
+function cleanDate(val){
+  if(!val)return '';
+  const s=String(val).trim();
+  // YYYY-MM-DD (possibly with time)
+  const iso=s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if(iso)return iso[1];
+  // MM/DD/YYYY
+  const slash=s.match(/^(\d{1,2}\/\d{1,2}\/\d{4})/);
+  if(slash)return slash[1];
+  return s;
+}
+
+// Returns "HH:mm" from a value — strips date prefix if present
+function cleanTime(val){
+  if(!val)return '—';
+  const s=String(val).trim();
+  // Already HH:mm or HH:mm:ss
+  const t=s.match(/(\d{1,2}:\d{2})/);
+  if(t)return t[1];
+  return s;
+}
 function getDayName(dateStr){
   const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  try{const p=dateStr.split(/[-/]/);const d=new Date(p[0],p[1]-1,p[2],12);return days[d.getDay()];}catch{return'';}
+  if(!dateStr)return '';
+  try{
+    // Strip time portion if present: "2026-03-08 15:00:00" → "2026-03-08"
+    const clean=String(dateStr).split(' ')[0].split('T')[0];
+    const p=clean.split(/[-/]/);
+    if(p.length<3)return '';
+    // Handle both YYYY-MM-DD and MM/DD/YYYY
+    let y,m,d;
+    if(clean.includes('-')&&p[0].length===4){y=+p[0];m=+p[1]-1;d=+p[2];}
+    else{m=+p[0]-1;d=+p[1];y=+p[2];}
+    return days[new Date(y,m,d,12).getDay()];
+  }catch(e){return '';}
 }
 
 // ══════════════════════════════════════════════════════════════════
